@@ -89,8 +89,10 @@ sudo systemctl start service-c service-b service-a
 ## Verification
 
 ```bash
-curl http://localhost/health
-curl http://localhost/greet-service-b
+curl http://localhost/service-a/health
+curl http://localhost/service-a/greet-service-b
+curl http://service-b.internal:3002/health
+curl http://service-c.internal:3003/health
 ```
 
 ## TODO
