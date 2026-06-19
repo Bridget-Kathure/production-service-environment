@@ -36,12 +36,11 @@ def greet(request: Request, x_request_id: str = Header(None)):
         "method": "GET"
     })
     try:
-        response = requests.get(
+        requests.get(
             "http://service-c.internal:3003/greet-c",
             headers={"X-Request-ID": request_id},
             timeout=5
-        )
-        response.raise_for_status()
+        ).raise_for_status()
     except requests.exceptions.RequestException:
         logger.error("request_failed", extra={
             "service_name": "service-b",

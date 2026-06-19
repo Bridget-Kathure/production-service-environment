@@ -3,7 +3,6 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import requests
 import uuid
-from datetime import datetime, timezone
 from logger import get_logger
 
 app = FastAPI()
@@ -13,6 +12,7 @@ logger = get_logger("service-a")
 async def health(request: Request):
     request_id = str(uuid.uuid4())
     logger.info("health_check", extra={
+        "service_name": "service-a",
         "request_id": request_id,
         "path": "/health",
         "status": 200,
@@ -26,36 +26,68 @@ async def health(request: Request):
     }
 
 @app.get("/greet-service-b")
-async def greet_service_b(request: Request, x_request_id: str = Header(None)):
+def greet_service_b(request: Request, x_request_id: str = Header(None)):
     request_id = x_request_id or str(uuid.uuid4())
     logger.info("request_received", extra={
+        "service_name": "service-a",
         "request_id": request_id,
         "path": "/greet-service-b",
         "status": 200,
         "method": "GET"
     })
-    # TODO: Call Service B at http://service-b.internal:3002/greet
-    # TODO: Pass X-Request-ID header
-    # TODO: Handle callback from Service C
-    return {"request_id": request_id, "status": "pending", "message": "TODO: implement full flow"}
+    try:
+        requests.get(
+            "http://service-b.internal:3002/greet",
+            headers={"X-Request-ID": request_id},
+            timeout=5
+        ).raise_for_status()
+    except requests.exceptions.RequestException:
+        logger.error("request_failed", extra={
+            "service_name": "service-a",
+            "request_id": request_id,
+            "path": "/greet-service-b",
+            "status": 502,
+            "method": "GET",
+            "error": "service_b_unreachable"
+        })
+        return JSONResponse(status_code=502, content={
+            "request_id": request_id,
+            "status": "error",
+            "message": "Service B unreachable"
+        })
+
+    logger.info("request_completed", extra={
+        "service_name": "service-a",
+        "request_id": request_id,
+        "path": "/greet-service-b",
+        "status": 200,
+        "method": "GET"
+    })
+    return {
+        "request_id": request_id,
+        "status": "success",
+        "message": "Request completed successfully"
+    }
 
 @app.post("/greeting-rcvd")
 async def greeting_rcvd(request: Request, x_request_id: str = Header(None)):
     body = await request.json()
     request_id = x_request_id or body.get("request_id", "unknown")
     logger.info("callback_received", extra={
+        "service_name": "service-a",
         "request_id": request_id,
         "path": "/greeting-rcvd",
         "status": 200,
         "method": "POST",
         "source_service": body.get("source_service", "unknown")
     })
-    return {"received": True, "status": "success"}
+    return {"status": "received"}
 
 @app.get("/{path:path}")
 async def catch_all(request: Request, path: str):
     request_id = str(uuid.uuid4())
     logger.info("route_not_found", extra={
+        "service_name": "service-a",
         "request_id": request_id,
         "path": f"/{path}",
         "status": 404,
@@ -64,4 +96,5 @@ async def catch_all(request: Request, path: str):
     return JSONResponse(status_code=404, content={"error": "Not found"})
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=3001)
+    uvicorn.run(app, host="127.0.0.1", port=3001)
+    
