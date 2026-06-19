@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=pearl
-WorkingDirectory=/home/pearl/devops-lab/production-service-environment
-Environment=PATH=/home/pearl/devops-lab/production-service-environment/venv/bin
-ExecStart=/home/pearl/devops-lab/production-service-environment/venv/bin/python3 services/service-c/app.py
+User=ubuntu
+WorkingDirectory=/home/ubuntu/devops-lab/production-service-environment
+Environment=PATH=/home/ubuntu/devops-lab/production-service-environment/venv/bin
+ExecStart=/home/ubuntu/devops-lab/production-service-environment/venv/bin/python3 services/service-c/app.py
 Restart=always
 RestartSec=3
 StandardOutput=journal
