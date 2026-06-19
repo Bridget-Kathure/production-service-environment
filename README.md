@@ -44,6 +44,8 @@ production-service-environment/
 │   └── service-c.service
 ├── nginx/
 │   └── production-env.conf
+├── scripts/
+│   └── install.sh
 └── README.md
 ```
 
@@ -133,7 +135,13 @@ sudo grep "$REQ_ID" /var/log/nginx/production-env.access.log
 - Nginx
 - systemd
 
-### Steps
+### One-Command Install (Recommended)
+
+```bash
+bash scripts/install.sh
+```
+
+### Manual Steps
 
 ```bash
 # 1. Install system dependencies
@@ -152,6 +160,9 @@ pip install fastapi uvicorn requests
 
 # 4. Configure service discovery
 echo "127.0.0.1 service-a.internal service-b.internal service-c.internal" | sudo tee -a /etc/hosts
+
+# For cloud VMs where /etc/hosts is managed by cloud-init, also add to the template:
+echo "127.0.0.1 service-a.internal service-b.internal service-c.internal" | sudo tee -a /etc/cloud/templates/hosts.debian.tmpl
 
 # 5. Install and enable systemd units
 sudo cp systemd/*.service /etc/systemd/system/
@@ -277,10 +288,10 @@ journalctl -u service-a -n 50 --no-pager
 ss -tlnp | grep 3001
 
 # Python or venv not found
-ls /home/pearl/devops-lab/production-service-environment/venv/bin/python3
+ls /home/ubuntu/devops-lab/production-service-environment/venv/bin/python3
 
 # Missing packages
-/home/pearl/devops-lab/production-service-environment/venv/bin/pip list | grep -E 'fastapi|uvicorn|requests|httpx'
+/home/ubuntu/devops-lab/production-service-environment/venv/bin/pip list | grep -E 'fastapi|uvicorn|requests'
 
 # Wrong WorkingDirectory or User in unit file
 systemctl cat service-a
@@ -325,6 +336,9 @@ getent hosts service-b.internal
 
 # If missing, re-add
 echo "127.0.0.1 service-a.internal service-b.internal service-c.internal" | sudo tee -a /etc/hosts
+
+# For cloud VMs where /etc/hosts is managed by cloud-init, also add to the template:
+echo "127.0.0.1 service-a.internal service-b.internal service-c.internal" | sudo tee -a /etc/cloud/templates/hosts.debian.tmpl
 ```
 
 ### Name resolution failures
