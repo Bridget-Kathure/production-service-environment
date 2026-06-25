@@ -3,14 +3,17 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import requests
 import uuid
+import time
 from logger import get_logger
 
 app = FastAPI()
 logger = get_logger("service-b")
+START_TIME = time.time()
 
 @app.get("/health")
 async def health(request: Request):
     request_id = str(uuid.uuid4())
+    uptime = round(time.time() - START_TIME, 2)
     logger.info("health_check", extra={
         "service_name": "service-b",
         "request_id": request_id,
@@ -22,8 +25,50 @@ async def health(request: Request):
         "service": "service-b",
         "status": "healthy",
         "port": 3002,
-        "message": "Hello service-b listening on 3002"
+        "uptime_seconds": uptime,
+        "check_type": "liveness"
     }
+
+@app.get("/ready")
+async def ready(request: Request):
+    request_id = str(uuid.uuid4())
+    try:
+        resp = requests.get(
+            "http://service-c.internal:3003/health",
+            headers={"X-Request-ID": request_id},
+            timeout=2
+        )
+        resp.raise_for_status()
+        logger.info("readiness_check", extra={
+            "service_name": "service-b",
+            "request_id": request_id,
+            "path": "/ready",
+            "status": 200,
+            "method": "GET",
+            "target": "service-c"
+        })
+        return {
+            "service": "service-b",
+            "status": "ready",
+            "downstream": "service-c",
+            "downstream_status": "healthy"
+        }
+    except requests.exceptions.RequestException as e:
+        logger.error("readiness_check_failed", extra={
+            "service_name": "service-b",
+            "request_id": request_id,
+            "path": "/ready",
+            "status": 503,
+            "method": "GET",
+            "error": str(e),
+            "target": "service-c"
+        })
+        return JSONResponse(status_code=503, content={
+            "service": "service-b",
+            "status": "not_ready",
+            "downstream": "service-c",
+            "downstream_status": "unreachable"
+        })
 
 @app.get("/greet")
 def greet(request: Request, x_request_id: str = Header(None)):

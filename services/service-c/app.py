@@ -3,15 +3,52 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import requests
 import uuid
+import time
+import threading
 from datetime import datetime, timezone
 from logger import get_logger
 
 app = FastAPI()
 logger = get_logger("service-c")
+START_TIME = time.time()
+
+def send_callback(request_id: str):
+    """Fire-and-forget callback to Service A."""
+    try:
+        requests.post(
+            "http://service-a.internal:3001/greeting-rcvd",
+            headers={"X-Request-ID": request_id},
+            json={
+                "request_id": request_id,
+                "source_service": "service-c",
+                "message": "Greeting processed",
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            },
+            timeout=5
+        ).raise_for_status()
+        logger.info("callback_sent", extra={
+            "service_name": "service-c",
+            "request_id": request_id,
+            "path": "/greet-c",
+            "status": 200,
+            "method": "GET",
+            "target": "service-a"
+        })
+    except requests.exceptions.RequestException as e:
+        logger.error("callback_failed", extra={
+            "service_name": "service-c",
+            "request_id": request_id,
+            "path": "/greet-c",
+            "status": 502,
+            "method": "GET",
+            "error": str(e),
+            "target": "service-a"
+        })
 
 @app.get("/health")
 async def health(request: Request):
     request_id = str(uuid.uuid4())
+    uptime = round(time.time() - START_TIME, 2)
     logger.info("health_check", extra={
         "service_name": "service-c",
         "request_id": request_id,
@@ -23,7 +60,25 @@ async def health(request: Request):
         "service": "service-c",
         "status": "healthy",
         "port": 3003,
-        "message": "Hello service-c listening on 3003"
+        "uptime_seconds": uptime,
+        "check_type": "liveness"
+    }
+
+@app.get("/ready")
+async def ready(request: Request):
+    request_id = str(uuid.uuid4())
+    logger.info("readiness_check", extra={
+        "service_name": "service-c",
+        "request_id": request_id,
+        "path": "/ready",
+        "status": 200,
+        "method": "GET"
+    })
+    return {
+        "service": "service-c",
+        "status": "ready",
+        "downstream": "none",
+        "downstream_status": "n/a"
     }
 
 @app.get("/greet-c")
@@ -37,41 +92,9 @@ def greet_c(request: Request, x_request_id: str = Header(None)):
         "method": "GET"
     })
 
-    try:
-        requests.post(
-            "http://service-a.internal:3001/greeting-rcvd",
-            headers={"X-Request-ID": request_id},
-            json={
-                "request_id": request_id,
-                "source_service": "service-c",
-                "message": "Greeting processed",
-                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            },
-            timeout=5
-        ).raise_for_status()
-    except requests.exceptions.RequestException:
-        logger.error("request_failed", extra={
-            "service_name": "service-c",
-            "request_id": request_id,
-            "path": "/greet-c",
-            "status": 502,
-            "method": "GET",
-            "error": "service_a_unreachable"
-        })
-        return JSONResponse(status_code=502, content={
-            "request_id": request_id,
-            "status": "error",
-            "callback_sent": False
-        })
+    # Fire callback in background thread so we return immediately to Service B
+    threading.Thread(target=send_callback, args=(request_id,), daemon=True).start()
 
-    logger.info("callback_sent", extra={
-        "service_name": "service-c",
-        "request_id": request_id,
-        "path": "/greet-c",
-        "status": 200,
-        "method": "GET",
-        "target": "service-a"
-    })
     return {"request_id": request_id, "status": "processed", "callback_sent": True}
 
 @app.get("/{path:path}")
@@ -88,4 +111,3 @@ async def catch_all(request: Request, path: str):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=3003)
-    

@@ -2,36 +2,37 @@
 set -e
 
 echo "========================================"
-echo "  Production Service Environment"
-echo "  Automated Installer"
+echo " Production Service Environment"
+echo " Automated Installer"
 echo "========================================"
 echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+USER_NAME="$(whoami)"
 
-echo "[1/8] Updating package lists..."
+echo "[1/9] Updating package lists..."
 sudo apt-get update -qq
 
-echo "[2/8] Installing system dependencies..."
+echo "[2/9] Installing system dependencies..."
 sudo apt-get install -y -qq python3 python3-pip python3-venv nginx
 
-echo "[3/8] Setting up Python virtual environment..."
+echo "[3/9] Setting up Python virtual environment..."
 cd "$PROJECT_DIR"
 if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
 source venv/bin/activate
-pip install -q fastapi uvicorn requests
+pip install -q -r requirements.txt
 
-echo "[4/8] Configuring service discovery (/etc/hosts)..."
+echo "[4/9] Configuring service discovery (/etc/hosts)..."
 if ! grep -q "service-a.internal" /etc/hosts 2>/dev/null; then
     echo "127.0.0.1 service-a.internal" | sudo tee -a /etc/hosts > /dev/null
     echo "127.0.0.1 service-b.internal" | sudo tee -a /etc/hosts > /dev/null
     echo "127.0.0.1 service-c.internal" | sudo tee -a /etc/hosts > /dev/null
-    echo "   Added service discovery entries to /etc/hosts"
+    echo "  Added service discovery entries to /etc/hosts"
 else
-    echo "   Service discovery entries already exist"
+    echo "  Service discovery entries already exist"
 fi
 
 if [ -f "/etc/cloud/templates/hosts.debian.tmpl" ]; then
@@ -39,24 +40,28 @@ if [ -f "/etc/cloud/templates/hosts.debian.tmpl" ]; then
         echo "127.0.0.1 service-a.internal" | sudo tee -a /etc/cloud/templates/hosts.debian.tmpl > /dev/null
         echo "127.0.0.1 service-b.internal" | sudo tee -a /etc/cloud/templates/hosts.debian.tmpl > /dev/null
         echo "127.0.0.1 service-c.internal" | sudo tee -a /etc/cloud/templates/hosts.debian.tmpl > /dev/null
-        echo "   Added to cloud-init template for reboot persistence"
+        echo "  Added to cloud-init template for reboot persistence"
     fi
 fi
 
-echo "[5/8] Installing systemd service files..."
+echo "[5/9] Generating systemd service files with dynamic paths..."
+python3 "$PROJECT_DIR/scripts/generate_systemd.py" "$USER_NAME" "$PROJECT_DIR"
+echo "  Generated systemd files for user=$USER_NAME, dir=$PROJECT_DIR"
+
+echo "[6/9] Installing systemd service files..."
 sudo cp "$PROJECT_DIR/systemd/"*.service /etc/systemd/system/
 sudo systemctl daemon-reload
 
-echo "[6/8] Enabling services for auto-start on boot..."
+echo "[7/9] Enabling services for auto-start on boot..."
 sudo systemctl enable service-c.service service-b.service service-a.service nginx
 
-echo "[7/8] Configuring Nginx..."
+echo "[8/9] Configuring Nginx..."
 sudo cp "$PROJECT_DIR/nginx/production-env.conf" /etc/nginx/sites-available/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo ln -sf /etc/nginx/sites-available/production-env.conf /etc/nginx/sites-enabled/
 sudo nginx -t
 
-echo "[8/8] Starting services..."
+echo "[9/9] Starting services..."
 sudo systemctl restart nginx
 sudo systemctl start service-c
 sleep 2

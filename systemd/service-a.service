@@ -1,8 +1,7 @@
 [Unit]
 Description=Service A - Public API Gateway
 After=network.target service-b.service service-c.service
-Requires=service-b.service service-c.service
-
+Wants=service-b.service service-c.service
 [Service]
 Type=simple
 User=ubuntu

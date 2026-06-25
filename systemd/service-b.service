@@ -1,8 +1,7 @@
 [Unit]
 Description=Service B - Internal Forwarding Service
 After=network.target service-c.service
-Requires=service-c.service
-
+Wants=service-c.service
 [Service]
 Type=simple
 User=ubuntu

@@ -3,14 +3,17 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import requests
 import uuid
+import time
 from logger import get_logger
 
 app = FastAPI()
 logger = get_logger("service-a")
+START_TIME = time.time()
 
 @app.get("/health")
 async def health(request: Request):
     request_id = str(uuid.uuid4())
+    uptime = round(time.time() - START_TIME, 2)
     logger.info("health_check", extra={
         "service_name": "service-a",
         "request_id": request_id,
@@ -22,8 +25,50 @@ async def health(request: Request):
         "service": "service-a",
         "status": "healthy",
         "port": 3001,
-        "message": "Hello service-a listening on 3001"
+        "uptime_seconds": uptime,
+        "check_type": "liveness"
     }
+
+@app.get("/ready")
+async def ready(request: Request):
+    request_id = str(uuid.uuid4())
+    try:
+        resp = requests.get(
+            "http://service-b.internal:3002/health",
+            headers={"X-Request-ID": request_id},
+            timeout=2
+        )
+        resp.raise_for_status()
+        logger.info("readiness_check", extra={
+            "service_name": "service-a",
+            "request_id": request_id,
+            "path": "/ready",
+            "status": 200,
+            "method": "GET",
+            "target": "service-b"
+        })
+        return {
+            "service": "service-a",
+            "status": "ready",
+            "downstream": "service-b",
+            "downstream_status": "healthy"
+        }
+    except requests.exceptions.RequestException as e:
+        logger.error("readiness_check_failed", extra={
+            "service_name": "service-a",
+            "request_id": request_id,
+            "path": "/ready",
+            "status": 503,
+            "method": "GET",
+            "error": str(e),
+            "target": "service-b"
+        })
+        return JSONResponse(status_code=503, content={
+            "service": "service-a",
+            "status": "not_ready",
+            "downstream": "service-b",
+            "downstream_status": "unreachable"
+        })
 
 @app.get("/greet-service-b")
 def greet_service_b(request: Request, x_request_id: str = Header(None)):
@@ -97,4 +142,3 @@ async def catch_all(request: Request, path: str):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=3001)
-    

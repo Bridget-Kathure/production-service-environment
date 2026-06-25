@@ -1,7 +1,6 @@
 [Unit]
 Description=Service C - Internal Processing Service
 After=network.target
-
 [Service]
 Type=simple
 User=ubuntu
