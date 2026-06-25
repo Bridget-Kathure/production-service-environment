@@ -16,7 +16,7 @@ def send_callback(request_id: str):
     """Fire-and-forget callback to Service A."""
     try:
         requests.post(
-            "http://service-a.internal:3001/greeting-rcvd",
+            "http://service-a:3001/greeting-rcvd",
             headers={"X-Request-ID": request_id},
             json={
                 "request_id": request_id,
@@ -110,4 +110,4 @@ async def catch_all(request: Request, path: str):
     return JSONResponse(status_code=404, content={"error": "Not found"})
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=3003)
+    uvicorn.run(app, host="0.0.0.0", port=3003)

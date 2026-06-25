@@ -405,3 +405,42 @@ REQ_ID=$(uuidgen)
 curl -s http://localhost/service-a/greet-service-b -H "X-Request-ID: $REQ_ID"
 journalctl -u service-a -u service-b -u service-c --no-pager | grep "$REQ_ID"
 ```
+
+## Running with Docker Compose
+
+### Start the system
+```bash
+docker compose up --build -d
+```
+
+### Test the public route
+```bash
+curl -i http://localhost:8080/service-a/health
+```
+
+### Prove B and C are internal-only
+```bash
+curl -i --connect-timeout 3 http://localhost:3002/health
+curl -i --connect-timeout 3 http://localhost:3003/health
+```
+Expected: connection refused or timeout.
+
+### View logs
+```bash
+docker compose logs
+docker compose logs service-a
+docker compose logs service-b
+docker compose logs service-c
+docker compose logs nginx
+```
+
+### Stop and restart a service
+```bash
+docker compose stop service-b
+docker compose start service-b
+```
+
+### Shut everything down
+```bash
+docker compose down
+```
