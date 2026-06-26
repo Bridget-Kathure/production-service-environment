@@ -1,446 +1,310 @@
 # Production Service Environment
 
-A production-style microservices environment demonstrating service discovery, reverse proxying, structured JSON logging, distributed request tracing, and systemd lifecycle management.
+A production-style microservices environment demonstrating service discovery, reverse proxying, structured JSON logging, distributed request tracing, systemd lifecycle management, and Docker Compose containerization.
+
+> **Branch:** `docker-compose-migration`
+> This branch adds Docker Compose containerization as an alternative to the VM-based systemd setup.
+> For the original VM-only version, see the [`main`](https://github.com/Bridget-Kathure/production-service-environment/tree/main) branch.
+
+---
+
+## Table of Contents
+
+1. [Project Overview](#project-overview)
+2. [Architecture](#architecture)
+3. [Technologies Used](#technologies-used)
+4. [Project Structure](#project-structure)
+5. [Deployment Options](#deployment-options)
+   - [Option A: VM with systemd](#option-a-vm-with-systemd)
+   - [Option B: Docker Compose](#option-b-docker-compose)
+6. [Peer Review Feedback & Fixes](#peer-review-feedback--fixes)
+7. [Logging](#logging)
+8. [Troubleshooting](#troubleshooting)
+
+---
 
 ## Project Overview
 
-This system runs three HTTP services that communicate through a defined request chain. All external traffic enters through an Nginx reverse proxy, which forwards only to Service A. Service A calls Service B, which calls Service C. Service C sends a callback to Service A upon completion. Services B and C are internal and unreachable from outside the VM.
+This system runs three HTTP services that communicate through a defined request chain. All external traffic enters through an **Nginx reverse proxy**, which forwards only to **Service A**. Service A calls Service B, which calls Service C. Service C sends an asynchronous callback to Service A upon completion. Services B and C are internal and unreachable from outside.
+
+**Two deployment options are supported:**
+- **VM with systemd** -- Services run as systemd units on an Ubuntu VM
+- **Docker Compose** -- Services run as containers with isolated networking (this branch)
+
+---
 
 ## Architecture
 
 ```
 Client
-  ↓
-Nginx (Port 80)           ← Public entry point; strips /service-a/ prefix
-  ↓
-Service A (Port 3001)     ← Public API gateway; initiates chain
-  ↓
-Service B (Port 3002)     ← Internal forwarding service
-  ↓
-Service C (Port 3003)     ← Internal processing service
-  ↓
-Service A /greeting-rcvd  ← Callback; completes the trace
+  |
+  v
+Nginx (Port 80 VM / 8080 Docker)  <-- Public entry point
+  |
+  v
+Service A (Port 3001)             <-- Public API gateway
+  |
+  v
+Service B (Port 3002)             <-- Internal forwarding
+  |
+  v
+Service C (Port 3003)             <-- Internal processing
+  |
+  v
+Service A /greeting-rcvd          <-- Async callback
 ```
 
-Only Service A is reachable through Nginx. Services B and C bind to `127.0.0.1` and are inaccessible from outside the VM.
+| Component | Role | Access |
+|-----------|------|--------|
+| **Nginx** | Reverse proxy, request ID assignment | Public |
+| **Service A** | Public API gateway, callback receiver | Public via Nginx only |
+| **Service B** | Internal forwarding service | Internal only |
+| **Service C** | Internal processing service | Internal only |
+
+---
+
+## Technologies Used
+
+| Component | Technology | Version | Purpose |
+|-----------|-----------|---------|---------|
+| **Language** | Python | 3.12+ | Application logic |
+| **Web Framework** | FastAPI | 0.115.0 | HTTP API framework |
+| **ASGI Server** | Uvicorn | 0.32.0 | WSGI/ASGI server |
+| **HTTP Client** | Requests | 2.32.0 | Service-to-service calls |
+| **Reverse Proxy** | Nginx | Latest | Traffic routing |
+| **VM Service Manager** | systemd | -- | Process supervision |
+| **Container Runtime** | Docker | 29.x | Container engine |
+| **Container Orchestration** | Docker Compose | 1.29.2+ | Multi-container management |
+| **Base Image** | `python:3.12-slim` | -- | Lightweight Python container |
+| **Nginx Image** | `nginx:alpine` | -- | Lightweight Nginx container |
+| **Logging** | Python `logging` + JSON formatter | -- | Structured logs to stdout |
+
+---
 
 ## Project Structure
 
 ```
 production-service-environment/
-├── services/
-│   ├── service-a/          # Public API gateway
-│   │   ├── app.py
-│   │   └── logger.py
-│   ├── service-b/          # Internal forwarding service
-│   │   ├── app.py
-│   │   └── logger.py
-│   └── service-c/          # Internal processing service
-│       ├── app.py
-│       └── logger.py
-├── systemd/
-│   ├── service-a.service
-│   ├── service-b.service
-│   └── service-c.service
-├── nginx/
-│   └── production-env.conf
-├── scripts/
-│   └── install.sh
-└── README.md
+|-- docker-compose.yml          # Docker Compose orchestration
+|-- requirements.txt            # Pinned Python dependencies
+|-- .dockerignore               # Docker build exclusions
+|-- README.md                   # This file
+|-- services/
+|   |-- service-a/
+|   |   |-- Dockerfile
+|   |   |-- app.py
+|   |   |-- logger.py
+|   |-- service-b/
+|   |   |-- Dockerfile
+|   |   |-- app.py
+|   |   |-- logger.py
+|   |-- service-c/
+|       |-- Dockerfile
+|       |-- app.py
+|       |-- logger.py
+|-- nginx/
+|   |-- production-env.conf     # Nginx config for VM
+|   |-- docker-nginx.conf       # Nginx config for Docker
+|-- systemd/
+|   |-- service-a.service
+|   |-- service-b.service
+|   |-- service-c.service
+|   |-- generate_systemd.py
+|-- scripts/
+|   |-- install.sh
+|   |-- generate_systemd.py
+|-- docs/
+    |-- CONTAINER_VALIDATION.md
 ```
 
-## Service Discovery
+---
 
-Services communicate using hostnames defined in `/etc/hosts` rather than hardcoded IP addresses.
+## Deployment Options
 
-**How services discover one another:** Each service references its peers by a `.internal` hostname (e.g. `http://service-b.internal:3002`). No external DNS is involved.
+### Option A: VM with systemd
 
-**How name resolution works:** The OS resolver checks `/etc/hosts` before querying DNS. This is controlled by `/etc/nsswitch.conf`, which has `hosts: files dns` — meaning `/etc/hosts` is checked first.
+Run services as systemd units on an Ubuntu VM. Services bind to loopback and communicate via /etc/hosts entries.
 
-**What component performs the resolution:** The system resolver (`libc`/`nss`). No additional service discovery daemon is needed.
+> For full VM setup instructions, see the `main` branch. Below is a quick reference.
 
-**Required `/etc/hosts` entries:**
-```
-127.0.0.1 service-a.internal service-b.internal service-c.internal
-```
-
-**Troubleshooting discovery failures:**
-```bash
-# Verify entries exist
-grep '\.internal' /etc/hosts
-
-# Test resolution
-getent hosts service-b.internal
-ping -c1 service-c.internal
-
-# Test reachability
-curl http://service-b.internal:3002/health
-```
-
-## Network Security
-
-Services B and C are internal and must not be reachable from outside the VM.
-
-**Why they are protected:** All external traffic must pass through Nginx, which only routes to Service A. Direct access to internal services would bypass the reverse proxy and expose internal endpoints.
-
-**What enforces the protection:**
-1. Services B and C bind to `127.0.0.1` (loopback only), not `0.0.0.0`. External packets never reach them.
-2. Nginx returns `403 Forbidden` for any requests to `/service-b/` or `/service-c/` paths.
-
-**How to verify:**
-```bash
-# From outside the VM — both should fail (connection refused)
-curl http://<public-ip>:3002/health
-curl http://<public-ip>:3003/health
-
-# Confirm services bind to loopback only
-ss -tlnp | grep -E '3002|3003'
-# Expected: 127.0.0.1:3002 and 127.0.0.1:3003
-
-# Confirm Nginx blocks internal paths
-curl -I http://localhost/service-b/health   # 403
-curl -I http://localhost/service-c/health   # 403
-```
-
-## Request Tracing
-
-Every request is assigned an `X-Request-ID` that propagates through the full chain.
-
-**How it works:**
-1. Nginx assigns `X-Request-ID` — it uses the client-provided value if present, otherwise generates one with `$request_id`. This value is forwarded to Service A.
-2. Service A reads the header and logs it. It passes the same ID to Service B.
-3. Service B passes it to Service C.
-4. Service C includes it in the callback POST body and header to Service A.
-5. Every log entry from every service and from Nginx contains the same `request_id`.
-
-**Following a request through logs:**
-```bash
-# Send a request and capture the ID
-REQ_ID=$(uuidgen)
-curl -s http://localhost/service-a/greet-service-b -H "X-Request-ID: $REQ_ID"
-
-# Trace it across all services
-journalctl -u service-a -u service-b -u service-c --no-pager | grep "$REQ_ID"
-
-# Also check Nginx
-sudo grep "$REQ_ID" /var/log/nginx/production-env.access.log
-```
-
-## Installation
-
-### Prerequisites
-
-- Ubuntu 22.04/24.04
-- Python 3.12+
-- Nginx
-- systemd
-
-### One-Command Install (Recommended)
+#### Quick Start (VM)
 
 ```bash
+git checkout main
 bash scripts/install.sh
 ```
 
-### Manual Steps
+#### Validation (VM)
 
 ```bash
-# 1. Install system dependencies
-# Note: if apt update exits with a GPG error, run the install step separately
-sudo apt update
-sudo apt install -y python3 python3-pip python3-venv nginx
-
-# 2. Clone the repository
-git clone <repo-url> ~/devops-lab/production-service-environment
-cd ~/devops-lab/production-service-environment
-
-# 3. Create virtual environment and install dependencies
-python3 -m venv venv
-source venv/bin/activate
-pip install fastapi uvicorn requests
-
-# 4. Configure service discovery
-echo "127.0.0.1 service-a.internal service-b.internal service-c.internal" | sudo tee -a /etc/hosts
-
-# For cloud VMs where /etc/hosts is managed by cloud-init, also add to the template:
-echo "127.0.0.1 service-a.internal service-b.internal service-c.internal" | sudo tee -a /etc/cloud/templates/hosts.debian.tmpl
-
-# 5. Install and enable systemd units
-sudo cp systemd/*.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable service-c service-b service-a
-
-# 6. Configure Nginx
-sudo cp nginx/production-env.conf /etc/nginx/sites-available/
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo ln -s /etc/nginx/sites-available/production-env.conf /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl restart nginx
-
-# 7. Start services (order matters for dependencies)
-sudo systemctl start service-c service-b service-a
-```
-
-## Operation
-
-### Start
-```bash
-sudo systemctl start service-c service-b service-a
-```
-
-### Stop
-```bash
-sudo systemctl stop service-a service-b service-c
-```
-
-### Restart a single service
-```bash
-sudo systemctl restart service-a
-```
-
-### Check status
-```bash
-sudo systemctl status service-a service-b service-c
-```
-
-### Verify health endpoints
-```bash
+# Health check
 curl http://localhost/service-a/health
-curl http://service-b.internal:3002/health
-curl http://service-c.internal:3003/health
-```
 
-## Validation
-
-### Full request chain
-```bash
+# Full chain
 curl -s http://localhost/service-a/greet-service-b | python3 -m json.tool
-```
-Expected: `{"request_id": "...", "status": "success", "message": "Request completed successfully"}`
 
-### Nginx routing
-```bash
-curl -I http://localhost/service-a/health    # 200
+# Prove B and C are internal
 curl -I http://localhost/service-b/health    # 403
 curl -I http://localhost/service-c/health    # 403
-curl -I http://localhost/anything            # 404
 ```
 
-### Auto-restart after failure
+---
+
+### Option B: Docker Compose
+
+Run services as containers with isolated Docker networking. Only Nginx publishes a host port.
+
+> This is the focus of the `docker-compose-migration` branch.
+
+#### Prerequisites
+
+- Docker
+- Docker Compose (v1.29.2+ or v2.x)
+
+#### Step 1: Ensure You Are on This Branch
+
 ```bash
-# systemctl stop is an intentional stop — it does NOT trigger auto-restart.
-# Simulate a crash by killing the process directly instead:
-sudo systemctl start service-b
-sudo kill -9 $(systemctl show -p MainPID service-b | cut -d= -f2)
-sleep 5
-sudo systemctl status service-b   # Should show active (running) — restarted after crash
+git checkout docker-compose-migration
 ```
 
-### Reboot recovery
+#### Step 2: Build and Start Containers
+
 ```bash
-sudo reboot
-# After reboot:
-sudo systemctl status service-a service-b service-c   # All active
-curl http://localhost/service-a/health                 # 200
+docker-compose up --build -d
 ```
+
+#### Step 3: Verify Containers
+
+```bash
+docker-compose ps
+```
+
+Expected: 4 containers Up. Only nginx has 0.0.0.0:8080->80/tcp.
+
+#### Step 4: Test Public Route
+
+```bash
+curl -s http://localhost:8080/service-a/health | python3 -m json.tool
+```
+
+#### Step 5: Prove B and C Are Internal-Only
+
+```bash
+curl -i --connect-timeout 3 http://localhost:3002/health   # Connection refused
+curl -i --connect-timeout 3 http://localhost:3003/health   # Connection refused
+```
+
+#### Step 6: Prove Internal Service Discovery
+
+```bash
+docker-compose exec service-a python -c "import urllib.request; print(urllib.request.urlopen('http://service-b:3002/health').read().decode())"
+docker-compose exec service-b python -c "import urllib.request; print(urllib.request.urlopen('http://service-c:3003/health').read().decode())"
+```
+
+#### Step 7: Trace One Request
+
+```bash
+curl -s http://localhost:8080/service-a/greet-service-b -H "X-Request-ID: demo-container-001"
+docker-compose logs | grep demo-container-001
+```
+
+Expected: Same ID in nginx, service-a, service-b, service-c logs.
+
+#### Step 8: Failure and Recovery Test
+
+```bash
+# Stop B
+docker-compose stop service-b
+
+# Send failing request
+curl -s http://localhost:8080/service-a/greet-service-b -H "X-Request-ID: fail-test-001"
+# Expected: {"status": "error", "message": "Service B unreachable"}
+
+# Check logs
+docker-compose logs service-a | grep fail-test-001
+
+# Recover
+docker-compose start service-b
+curl -s http://localhost:8080/service-a/greet-service-b -H "X-Request-ID: recover-test-001"
+# Expected: {"status": "success"}
+```
+
+#### Step 9: Shut Down
+
+```bash
+docker-compose down
+```
+
+---
+
+## Peer Review Feedback & Fixes
+
+Original score: **88/100** ("Approve with changes")
+
+| # | Issue | Original Problem | Fix Applied |
+|---|-------|-----------------|-------------|
+| 1 | **Synchronous callback deadlock** | Service C made blocking requests.post() to Service A before returning | Changed to threading.Thread fire-and-forget |
+| 2 | **systemd cascading shutdown** | Requires= caused cascading failures | Replaced with Wants= in all .service files |
+| 3 | **Hardcoded paths & users** | /home/ubuntu and User=ubuntu hardcoded | Created scripts/generate_systemd.py for dynamic generation |
+| 4 | **No requirements.txt** | Unpinned pip install in install.sh | Created requirements.txt with pinned versions |
+| 5 | **Static health checks** | /health returned hardcoded JSON | Added uptime_seconds, check_type, and /ready endpoints |
+
+---
 
 ## Logging
 
-All services write structured JSON logs to stdout, captured by the systemd journal.
+All services emit structured JSON logs to stdout.
 
-### Viewing logs
+### VM: systemd journal
+
 ```bash
-# Recent logs for a service
 journalctl -u service-a -n 50 --no-pager
-
-# Follow live
 journalctl -u service-a -f
-
-# All services together, last 5 minutes
 journalctl -u service-a -u service-b -u service-c --since "5 minutes ago" --no-pager
-
-# Nginx access log
 sudo tail -f /var/log/nginx/production-env.access.log
 ```
 
-### Log fields
+### Docker Compose
+
+```bash
+docker-compose logs
+docker-compose logs service-a
+docker-compose logs -f
+```
+
+### Log Fields
 
 | Field | Description |
-|---|---|
-| `timestamp` | UTC ISO 8601 |
-| `service` | `service-a`, `service-b`, or `service-c` |
-| `event` | What happened (`request_received`, `callback_sent`, `request_failed`, etc.) |
-| `request_id` | Trace ID shared across all services for one request |
-| `path` | HTTP path |
-| `method` | HTTP method |
-| `status` | HTTP status code |
-| `target` | Downstream service called (when applicable) |
-| `source_service` | Upstream service that sent the request (when applicable) |
-| `error` | Error description (on failure events only) |
+|-------|-------------|
+| timestamp | UTC ISO 8601 |
+| service | Service name |
+| event | Event type |
+| request_id | Trace ID shared across services |
+| path | HTTP path |
+| method | HTTP method |
+| status | HTTP status code |
+| target | Downstream service |
+| error | Error description |
+
+---
 
 ## Troubleshooting
 
-### Service startup failures
-```bash
-sudo systemctl status service-a
-journalctl -u service-a -n 50 --no-pager
+### VM Setup
 
-# Common causes:
-# Port already in use
-ss -tlnp | grep 3001
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Service won't start | Port in use | ss -tlnp | grep 3001 |
+| Missing packages | venv not activated | source venv/bin/activate && pip install -r requirements.txt |
+| Can't reach peer | /etc/hosts missing | grep '.internal' /etc/hosts |
+| Nginx 502 | Service not running | sudo systemctl status service-a |
+| No logs | Journal full | journalctl --disk-usage |
 
-# Python or venv not found
-ls /home/ubuntu/devops-lab/production-service-environment/venv/bin/python3
+### Docker Compose
 
-# Missing packages
-/home/ubuntu/devops-lab/production-service-environment/venv/bin/pip list | grep -E 'fastapi|uvicorn|requests'
-
-# Wrong WorkingDirectory or User in unit file
-systemctl cat service-a
-```
-
-### Service dependency failures
-```bash
-# Service A requires B and C. If either is stopped, A will not start.
-sudo systemctl status service-b service-c
-
-# Start in dependency order
-sudo systemctl start service-c
-sudo systemctl start service-b
-sudo systemctl start service-a
-
-# View dependency chain
-systemctl cat service-a | grep -E 'After|Requires'
-```
-
-### Reverse proxy failures
-```bash
-sudo systemctl status nginx
-sudo nginx -t
-
-# Check error log
-sudo tail -50 /var/log/nginx/production-env.error.log
-
-# Verify config is linked
-ls -la /etc/nginx/sites-enabled/
-
-# Reload after config change (no downtime)
-sudo nginx -s reload
-```
-
-### Service discovery failures
-```bash
-# Check /etc/hosts
-grep '\.internal' /etc/hosts
-
-# Test resolution
-getent hosts service-b.internal
-
-# If missing, re-add
-echo "127.0.0.1 service-a.internal service-b.internal service-c.internal" | sudo tee -a /etc/hosts
-
-# For cloud VMs where /etc/hosts is managed by cloud-init, also add to the template:
-echo "127.0.0.1 service-a.internal service-b.internal service-c.internal" | sudo tee -a /etc/cloud/templates/hosts.debian.tmpl
-```
-
-### Name resolution failures
-```bash
-# nsswitch.conf must have 'files' before 'dns'
-grep '^hosts' /etc/nsswitch.conf
-# Expected: hosts: files dns
-
-# If 'dns' appears first, /etc/hosts entries are skipped.
-# Edit /etc/nsswitch.conf to put 'files' first.
-```
-
-### Network access failures
-```bash
-# Confirm each service binds to the correct interface
-ss -tlnp | grep -E '3001|3002|3003'
-# Service A: 127.0.0.1:3001
-# Service B: 127.0.0.1:3002
-# Service C: 127.0.0.1:3003
-
-# Check firewall
-sudo ufw status
-sudo iptables -L INPUT -n
-```
-
-### Missing logs
-```bash
-# Confirm service is running
-sudo systemctl status service-a
-
-# Check journal for startup errors
-journalctl -u service-a --since "10 minutes ago" --no-pager
-
-# Verify journal disk usage is not full
-journalctl --disk-usage
-```
-
-### Invalid routing behavior
-```bash
-# Test each route explicitly
-curl -v http://localhost/service-a/health    # expect 200
-curl -v http://localhost/service-b/health    # expect 403
-curl -v http://localhost/service-c/health    # expect 403
-curl -v http://localhost/anything-else       # expect 404
-
-# Inspect active Nginx config
-sudo nginx -T 2>&1 | grep -A5 'location'
-
-# Confirm the correct config is enabled
-ls -la /etc/nginx/sites-enabled/
-```
-
-### Inter-service communication failures
-```bash
-# Test each hop manually with a consistent request ID
-curl http://service-b.internal:3002/greet -H "X-Request-ID: test-123"
-curl http://service-c.internal:3003/greet-c -H "X-Request-ID: test-123"
-
-# Confirm /etc/hosts maps to 127.0.0.1
-getent hosts service-b.internal
-
-# Trace a full request and check logs at each service
-REQ_ID=$(uuidgen)
-curl -s http://localhost/service-a/greet-service-b -H "X-Request-ID: $REQ_ID"
-journalctl -u service-a -u service-b -u service-c --no-pager | grep "$REQ_ID"
-```
-
-## Running with Docker Compose
-
-### Start the system
-```bash
-docker compose up --build -d
-```
-
-### Test the public route
-```bash
-curl -i http://localhost:8080/service-a/health
-```
-
-### Prove B and C are internal-only
-```bash
-curl -i --connect-timeout 3 http://localhost:3002/health
-curl -i --connect-timeout 3 http://localhost:3003/health
-```
-Expected: connection refused or timeout.
-
-### View logs
-```bash
-docker compose logs
-docker compose logs service-a
-docker compose logs service-b
-docker compose logs service-c
-docker compose logs nginx
-```
-
-### Stop and restart a service
-```bash
-docker compose stop service-b
-docker compose start service-b
-```
-
-### Shut everything down
-```bash
-docker compose down
-```
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Container won't start | Port 8080 in use | docker-compose down && lsof -i :8080 |
+| Can't reach service | Wrong hostname | Use service-b, not localhost |
+| Build fails | Missing requirements.txt | Ensure file is in repo root |
+| Logs empty | Service crashed | docker-compose logs --tail 50 <service> |
