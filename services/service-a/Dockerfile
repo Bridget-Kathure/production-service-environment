@@ -7,11 +7,13 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy service code
-COPY services/service-a/app.py ./services/service-a/
-COPY services/service-a/logger.py ./services/service-a/
+COPY app.py .
+COPY logger.py .
 
-# Expose port
+# Create non-root user
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+USER appuser
+
 EXPOSE 3001
 
-# Run the service
-CMD ["python", "services/service-a/app.py"]
+CMD ["python", "app.py"]
