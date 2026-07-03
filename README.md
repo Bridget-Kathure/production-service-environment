@@ -294,23 +294,23 @@ This project uses GitHub Actions for continuous integration and deployment. Ever
 
 ### Latest deployed version
 
-Commit: `<full-commit-hash>`
-Image tag: `sha-<short-commit-hash>`
+Commit: `71dd25563ae7b9fc1755b7fefdf886eb6af343ec`
+Image tag: `sha-71dd255`
 
 Images:
-- `bridget-kathure/production-service-environment-service-a:sha-<short-commit-hash>`
-- `bridget-kathure/production-service-environment-service-b:sha-<short-commit-hash>`
-- `bridget-kathure/production-service-environment-service-c:sha-<short-commit-hash>`
+- `ainembabazi/production-service-environment-service-a:sha-71dd255`
+- `ainembabazi/production-service-environment-service-b:sha-71dd255`
+- `ainembabazi/production-service-environment-service-c:sha-71dd255`
 
 ### Deploy
 
 ```bash
 # Set environment variables
-export DOCKERHUB_USERNAME=bridget-kathure
+export DOCKERHUB_USERNAME=ainembabazi
 export APP_NAME=production-service-environment
 
 # Deploy a specific version using the deployment script
-./scripts/deploy.sh sha-<short-commit-hash>
+./scripts/deploy.sh sha-71dd255
 ```
 
 **Verify Deployment**
