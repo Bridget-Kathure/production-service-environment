@@ -2,15 +2,14 @@
 
 A production-style microservices environment demonstrating service discovery, reverse proxying, structured JSON logging, distributed request tracing, systemd lifecycle management, and Docker Compose containerization.
 
-> **Branch:** `docker-compose-migration`
-> This branch adds Docker Compose containerization as an alternative to the VM-based systemd setup.
-> For the original VM-only version, see the [`main`](https://github.com/Bridget-Kathure/production-service-environment/tree/main) branch.
+> This repository now uses Docker Compose containerization with a GitHub Actions CI/CD pipeline as the primary deployment path (see [For Reviewers](#for-reviewers) and [Container CI/CD Deployment](#container-cicd-deployment) below). The original VM/systemd setup is documented under [Option A](#option-a-vm-with-systemd) for reference.
 
 ---
 
 ## Table of Contents
 
-1. [Project Overview](#project-overview)
+1. [For Reviewers](#for-reviewers)
+2. [Project Overview](#project-overview)
 2. [Architecture](#architecture)
 3. [Technologies Used](#technologies-used)
 4. [Project Structure](#project-structure)
@@ -22,6 +21,90 @@ A production-style microservices environment demonstrating service discovery, re
 8. [Troubleshooting](#troubleshooting)
 
 ---
+
+
+---
+
+## For Reviewers
+
+This section maps directly to the assignment's peer-review checklist. Each item below can be verified independently in under a few minutes -- no source code trust required.
+
+**Repo:** https://github.com/Bridget-Kathure/production-service-environment
+**Docker Hub namespace:** `ainembabazi`
+
+### 1. CI proves code quality before Docker packaging, and failed tests would block merge
+
+Open the [Actions tab](https://github.com/Bridget-Kathure/production-service-environment/actions) and look at any pull request run. You'll see three matrix jobs -- one per service -- each running `pytest` before any Docker build step. A failing test or failing `pip install` fails that job and blocks the rest of the pipeline.
+
+### 2. Images are commit-tagged, pullable, and never `:latest`
+
+Pull the currently published images directly -- no login required:
+
+```bash
+docker pull ainembabazi/production-service-environment-service-a:sha-71dd255
+docker pull ainembabazi/production-service-environment-service-b:sha-71dd255
+docker pull ainembabazi/production-service-environment-service-c:sha-71dd255
+```
+
+Tags follow `sha-<short-commit-hash>` exclusively. Check the [workflow file](.github/workflows/container-ci-cd.yml) -- there is no code path that pushes a `latest`, `main`, or `dev` tag.
+
+### 3. Publishing only happens on `main`, never on pull requests
+
+Open any pull request's checks and note the `Publish Docker images` job shows as **Skipped**. Compare against a push-to-main run in the [Actions tab](https://github.com/Bridget-Kathure/production-service-environment/actions), where the same job actually executes and pushes images. This is enforced by `if: github.event_name == 'push' && github.ref == 'refs/heads/main'` in the workflow, not by convention.
+
+### 4. Runtime does not rebuild locally
+
+`docker-compose.prod.yml` uses `image:`, not `build:`, for every service:
+
+```bash
+grep -A1 "^  service-a:" docker-compose.prod.yml
+```
+
+You'll see it references `${DOCKERHUB_USERNAME}/${APP_NAME}-service-a:${IMAGE_TAG}` -- a pulled image, not a local Dockerfile.
+
+### 5. Deployment works end-to-end from a clean clone
+
+```bash
+git clone https://github.com/Bridget-Kathure/production-service-environment.git
+cd production-service-environment
+cp .env.example .env
+export DOCKERHUB_USERNAME=ainembabazi
+export APP_NAME=production-service-environment
+./scripts/deploy.sh sha-71dd255
+docker compose -f docker-compose.prod.yml ps
+curl http://localhost:8080/service-a/health
+curl http://localhost:8080/service-a/ready
+```
+
+Expected: `service-a` reports `"status":"healthy"`, and the readiness check confirms `service-b` is reachable through the internal network.
+
+### 6. Only the gateway is exposed; internal services are network-isolated
+
+```bash
+# service-b/c should be unreachable from the host -- no port mapping exists
+curl -m 3 http://localhost:3002/health   # expect: connection refused
+
+# nginx explicitly blocks direct routing to internal services
+curl -i http://localhost:8080/service-b/  # expect: 403 Forbidden
+curl -i http://localhost:8080/service-c/  # expect: 403 Forbidden
+```
+
+### 7. Containers avoid root
+
+```bash
+docker run --rm ainembabazi/production-service-environment-service-a:sha-71dd255 whoami
+# expect: appuser
+```
+
+### 8. No secrets committed
+
+`DOCKERHUB_TOKEN` and `DOCKERHUB_USERNAME` are stored as a GitHub repository secret and variable respectively -- never in source. `.env` is gitignored; only `.env.example` (with placeholder values) is tracked.
+
+### Cleanup
+
+```bash
+docker compose -f docker-compose.prod.yml down
+```
 
 ## Project Overview
 
