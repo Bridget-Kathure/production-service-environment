@@ -288,6 +288,65 @@ docker-compose logs -f
 
 ---
 
+## Container CI/CD Deployment
+
+This project uses GitHub Actions for continuous integration and deployment. Every pull request to `main` triggers automated tests, builds, and container verification. Only successful merges to `main` publish images to Docker Hub.
+
+### Latest deployed version
+
+Commit: `<full-commit-hash>`
+Image tag: `sha-<short-commit-hash>`
+
+Images:
+- `bridget-kathure/production-service-environment-service-a:sha-<short-commit-hash>`
+- `bridget-kathure/production-service-environment-service-b:sha-<short-commit-hash>`
+- `bridget-kathure/production-service-environment-service-c:sha-<short-commit-hash>`
+
+### Deploy
+
+```bash
+# Set environment variables
+export DOCKERHUB_USERNAME=bridget-kathure
+export APP_NAME=production-service-environment
+
+# Deploy a specific version using the deployment script
+./scripts/deploy.sh sha-<short-commit-hash>
+```
+
+**Verify Deployment**
+
+```bash
+# Check running containers
+docker compose -f docker-compose.prod.yml ps
+
+# Test health endpoint
+curl http://localhost:8080/service-a/health
+```
+
+**CI/CD Pipeline Overview**
+
+| Stage              | Trigger               | What It Does                                                     |
+| ------------------ | ---------------------- | ----------------------------------------------------------------|
+| **Verify**         | PR + Push to main      | Installs Python deps, runs pytest, builds Docker images locally |
+| **Verify Compose** | After Verify succeeds  | Validates compose config, builds full stack, runs health checks |
+| **Publish**        | Push to main only      | Logs into Docker Hub, builds and pushes commit-tagged images    |
+
+**Required GitHub Secrets & Variables**
+
+| Name                 | Type                 | Purpose                                    |
+| --------------------- | -------------------- | ------------------------------------------ |
+| `DOCKERHUB_USERNAME` | Repository Variable  | Docker Hub username for image naming       |
+| `DOCKERHUB_TOKEN`    | Repository Secret    | Docker Hub access token for authentication |
+
+**Image Tag Format**
+
+Images are tagged with the short commit hash: `sha-<7-char-hash>`
+
+Allowed: `sha-a1b2c3d`
+
+Not Allowed: `latest`, `main`, `dev`
+
+
 ## Troubleshooting
 
 ### VM Setup
