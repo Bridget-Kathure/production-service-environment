@@ -34,7 +34,7 @@ async def ready(request: Request):
     request_id = str(uuid.uuid4())
     try:
         resp = requests.get(
-            "http://service-c.internal:3003/health",
+            "http://service-c:3003/health",
             headers={"X-Request-ID": request_id},
             timeout=2
         )
@@ -82,7 +82,7 @@ def greet(request: Request, x_request_id: str = Header(None)):
     })
     try:
         requests.get(
-            "http://service-c.internal:3003/greet-c",
+            "http://service-c:3003/greet-c",
             headers={"X-Request-ID": request_id},
             timeout=5
         ).raise_for_status()
@@ -124,4 +124,4 @@ async def catch_all(request: Request, path: str):
     return JSONResponse(status_code=404, content={"error": "Not found"})
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=3002)
+    uvicorn.run(app, host="0.0.0.0", port=3002)
