@@ -1,0 +1,32 @@
+groups:
+  - name: observability-lab-alerts
+    rules:
+      # Alert 1: Service Down
+      - alert: ServiceDown
+        expr: up{job=~"service-a|service-b|service-c"} == 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} has been down for more than 15 seconds."
+
+      # Alert 2: High Error Rate
+      - alert: HighErrorRate
+        expr: sum by (service) (rate(http_errors_total[2m])) / sum by (service) (rate(http_requests_total[2m])) > 0.1
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "Error rate is above 10% for service {{ $labels.service }}."
+
+      # Alert 3: High Latency
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket[5m]))) > 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High p95 latency on {{ $labels.service }}"
+          description: "p95 latency is above 1 second for service {{ $labels.service }}."
