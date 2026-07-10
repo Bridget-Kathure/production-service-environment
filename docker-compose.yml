@@ -22,9 +22,12 @@ services:
       BIND_HOST: 0.0.0.0
       SERVICE_B_URL: http://service-b:3002
       SERVICE_C_URL: http://service-c:3003
+      JAEGER_AGENT_HOST: jaeger
+      JAEGER_AGENT_PORT: "6831"
     depends_on:
       - service-b
       - service-c
+      - jaeger
     restart: unless-stopped
     networks:
       - backend
@@ -37,6 +40,11 @@ services:
     environment:
       BIND_HOST: 0.0.0.0
       SERVICE_C_URL: http://service-c:3003
+      JAEGER_AGENT_HOST: jaeger
+      JAEGER_AGENT_PORT: "6831"
+    depends_on:
+      - service-c
+      - jaeger
     restart: unless-stopped
     networks:
       - backend
@@ -48,11 +56,64 @@ services:
     container_name: service-c
     environment:
       BIND_HOST: 0.0.0.0
+      JAEGER_AGENT_HOST: jaeger
+      JAEGER_AGENT_PORT: "6831"
+    depends_on:
+      - jaeger
     restart: unless-stopped
     networks:
+      - backend
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    restart: unless-stopped
+    networks:
+      - frontend
+      - backend
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      - frontend
+      - backend
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+      - "6831:6831/udp"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    restart: unless-stopped
+    networks:
+      - frontend
       - backend
 
 networks:
   frontend:
   backend:
     internal: true
+
+volumes:
+  prometheus-data:
+  grafana-data:
