@@ -25,6 +25,74 @@ A production-style microservices environment demonstrating service discovery, re
 
 ---
 
+## Observability Stack
+
+This project includes a full MELT (Metrics, Events, Logs, Traces) observability layer.
+
+### Quick Start
+
+```bash
+# Start everything
+docker compose up -d
+
+# Access services
+curl http://localhost:8080/service-a/health
+curl http://localhost:8080/service-a/metrics
+curl http://localhost:8080/service-a/greet-service-b
+```
+
+Access observability tools:
+- Grafana: http://localhost:3000
+- Prometheus: http://localhost:9090
+- Jaeger: http://localhost:16686
+
+### Grafana Dashboard
+- URL: http://localhost:3000
+- Login: admin / admin
+- Dashboard: "Observability Lab - Service Overview"
+- Panels: Service health, request rate, error rate, p95 latency, alert state
+
+### Prometheus
+- URL: http://localhost:9090
+- Scrapes: service-a:3001, service-b:3002, service-c:3003
+- Rules: ServiceDown, HighErrorRate, HighLatency
+
+### Jaeger Tracing
+- URL: http://localhost:16686
+- Services: service-a, service-b, service-c
+- Search by service name to see multi-service request traces
+
+### Logs
+
+```bash
+# View structured JSON logs
+docker compose logs service-a
+docker compose logs service-b
+docker compose logs service-c
+```
+
+### Load Testing
+
+```bash
+# Run k6 load test (normal, stress, failure scenarios)
+k6 run scripts/load-test.js
+```
+
+### Controlled Failure Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| /fail | Returns 500 error |
+| /slow | Returns 200 after 1-3s delay |
+
+### Alert Rules
+
+| Alert | Condition | Severity |
+|-------|-----------|----------|
+| ServiceDown | up == 0 for 15s | critical |
+| HighErrorRate | Error rate > 10% for 30s | warning |
+| HighLatency | p95 latency > 1s for 1m | warning |
+
 ## For Reviewers
 
 This section maps directly to the assignment's peer-review checklist. Each item below can be verified independently in under a few minutes -- no source code trust required.
