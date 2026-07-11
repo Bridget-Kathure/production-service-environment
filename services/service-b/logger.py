@@ -8,8 +8,10 @@ class JSONFormatter(logging.Formatter):
         log_obj = {
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "service": getattr(record, "service_name", "unknown"),
+            "level": record.levelname.lower(),
             "event": record.msg,
             "request_id": getattr(record, "request_id", "none"),
+            "trace_id": getattr(record, "trace_id", "none"),
             "path": getattr(record, "path", "unknown"),
             "status": getattr(record, "status", 0),
             "method": getattr(record, "method", "UNKNOWN"),

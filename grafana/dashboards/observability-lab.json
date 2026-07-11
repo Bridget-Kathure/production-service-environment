@@ -344,7 +344,7 @@
       },
       "targets": [
         {
-          "expr": "service_up_total",
+          "expr": "service_up",
           "legendFormat": "{{service}}",
           "refId": "A",
           "datasource": {

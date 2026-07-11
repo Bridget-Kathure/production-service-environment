@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Request, Header
 from fastapi.responses import JSONResponse, Response
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 import uvicorn
 import requests
 import uuid
 import time
+import asyncio
 import random
 from logger import get_logger
 
@@ -50,14 +51,14 @@ http_errors_total = Counter(
     ['service', 'route', 'error_type']
 )
 
-service_up = Counter(
-    'service_up_total',
+service_up = Gauge(
+    'service_up',
     'Service uptime indicator',
     ['service']
 )
 
 # Mark service as up
-service_up.labels(service="service-b").inc()
+service_up.labels(service="service-b").set(1)
 
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
@@ -160,7 +161,10 @@ async def ready(request: Request):
 def greet(request: Request, x_request_id: str = Header(None)):
     request_id = x_request_id or str(uuid.uuid4())
 
-    with tracer.start_as_current_span("greet") as span:
+    carrier = dict(request.headers)
+    ctx = TraceContextTextMapPropagator().extract(carrier=carrier)
+
+    with tracer.start_as_current_span("greet", context=ctx) as span:
         span.set_attribute("http.method", "GET")
         span.set_attribute("http.route", "/greet")
         span.set_attribute("request_id", request_id)
@@ -177,10 +181,10 @@ def greet(request: Request, x_request_id: str = Header(None)):
         # Propagate trace context to service-c
         headers = {"X-Request-ID": request_id}
         propagator = TraceContextTextMapPropagator()
-        propagator.inject(headers)
 
         try:
             with tracer.start_as_current_span("call_service_c"):
+                propagator.inject(headers)
                 resp = requests.get(
                     "http://service-c:3003/greet-c",
                     headers=headers,
@@ -238,7 +242,7 @@ async def slow_endpoint(request: Request):
     with tracer.start_as_current_span("slow_endpoint") as span:
         span.set_attribute("delay_seconds", delay)
         span.set_attribute("request_id", request_id)
-        time.sleep(delay)
+        await asyncio.sleep(delay)
         logger.info("slow_response", extra={
             "service_name": "service-b",
             "request_id": request_id,
