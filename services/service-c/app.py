@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Request, Header
 from fastapi.responses import JSONResponse, Response
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 import uvicorn
 import requests
 import uuid
 import time
+import asyncio
 import random
 import threading
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from logger import get_logger
 
 # Jaeger / OpenTelemetry tracing
 from opentelemetry import trace
+from opentelemetry import context as otel_context
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -52,14 +54,14 @@ http_errors_total = Counter(
     ['service', 'route', 'error_type']
 )
 
-service_up = Counter(
-    'service_up_total',
+service_up = Gauge(
+    'service_up',
     'Service uptime indicator',
     ['service']
 )
 
 # Mark service as up
-service_up.labels(service="service-c").inc()
+service_up.labels(service="service-c").set(1)
 
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
@@ -97,8 +99,9 @@ async def metrics_middleware(request: Request, call_next):
 async def metrics():
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
-def send_callback(request_id: str):
+def send_callback(request_id: str, parent_ctx):
     """Fire-and-forget callback to Service A."""
+    otel_context.attach(parent_ctx)
     with tracer.start_as_current_span("send_callback_to_service_a") as span:
         span.set_attribute("target_service", "service-a")
         span.set_attribute("request_id", request_id)
@@ -178,7 +181,10 @@ async def ready(request: Request):
 def greet_c(request: Request, x_request_id: str = Header(None)):
     request_id = x_request_id or str(uuid.uuid4())
 
-    with tracer.start_as_current_span("greet_c") as span:
+    carrier = dict(request.headers)
+    ctx = TraceContextTextMapPropagator().extract(carrier=carrier)
+
+    with tracer.start_as_current_span("greet_c", context=ctx) as span:
         span.set_attribute("http.method", "GET")
         span.set_attribute("http.route", "/greet-c")
         span.set_attribute("request_id", request_id)
@@ -193,7 +199,8 @@ def greet_c(request: Request, x_request_id: str = Header(None)):
         })
 
         # Fire callback in background thread so we return immediately to Service B
-        threading.Thread(target=send_callback, args=(request_id,), daemon=True).start()
+        current_ctx = otel_context.get_current()
+        threading.Thread(target=send_callback, args=(request_id, current_ctx), daemon=True).start()
 
         return {"request_id": request_id, "status": "processed", "callback_sent": True}
 
@@ -220,7 +227,7 @@ async def slow_endpoint(request: Request):
     with tracer.start_as_current_span("slow_endpoint") as span:
         span.set_attribute("delay_seconds", delay)
         span.set_attribute("request_id", request_id)
-        time.sleep(delay)
+        await asyncio.sleep(delay)
         logger.info("slow_response", extra={
             "service_name": "service-c",
             "request_id": request_id,
