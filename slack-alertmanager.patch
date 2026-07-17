@@ -1,0 +1,159 @@
+diff --git a/.gitignore b/.gitignore
+index a35f6eb..7492c10 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -33,3 +33,6 @@ Thumbs.db
+ 
+ # Git
+ .git/
++
++# Alertmanager (contains real Slack webhook URL - never commit)
++alertmanager/alertmanager.yml
+diff --git a/README.md b/README.md
+index 3faa84a..98d3467 100644
+--- a/README.md
++++ b/README.md
+@@ -93,6 +93,41 @@ k6 run scripts/load-test.js
+ | HighErrorRate | Error rate > 10% for 30s | warning |
+ | HighLatency | p95 latency > 1s for 1m | warning |
+ 
++### Slack Alerting (Alertmanager)
++
++Alerts defined in `alert-rules.yml` are evaluated by Prometheus and routed through
++**Alertmanager** to a Slack channel via an incoming webhook.
++
++**One-time setup (per person running the stack):**
++
++1. In Slack, create an [Incoming Webhook](https://api.slack.com/messaging/webhooks) for the channel you want alerts posted to (e.g. `#alerts`). Copy the webhook URL.
++2. Copy the template config:
++   ```bash
++   cp alertmanager/alertmanager.yml.example alertmanager/alertmanager.yml
++   ```
++3. Edit `alertmanager/alertmanager.yml` and replace the placeholder `api_url` with your real Slack webhook URL.
++4. `alertmanager/alertmanager.yml` is gitignored -- it will never be committed, so your webhook URL stays private.
++5. Start (or restart) the stack:
++   ```bash
++   docker compose up -d
++   ```
++
++**Verify it works:**
++
++```bash
++# Trigger a controlled failure so ServiceDown or HighErrorRate fires
++curl http://localhost:8080/service-a/fail
++curl http://localhost:8080/service-a/fail
++curl http://localhost:8080/service-a/fail
++
++# Check Alertmanager sees it
++curl http://localhost:9093/api/v2/alerts
++```
++
++Access Alertmanager's UI at http://localhost:9093 to see alert grouping and routing state. Within a few seconds of an alert firing, you should see it posted to your configured Slack channel.
++
++> **Note:** `docker-compose.prod.yml` (used by the CI/CD deployment path) does not currently include Prometheus/Alertmanager/Grafana/Jaeger -- this alerting setup applies to the local dev stack (`docker-compose.yml`). Extending the production compose file to include monitoring is a good next step before relying on this in a deployed environment.
++
+ ## For Reviewers
+ 
+ This section maps directly to the assignment's peer-review checklist. Each item below can be verified independently in under a few minutes -- no source code trust required.
+diff --git a/alertmanager/alertmanager.yml.example b/alertmanager/alertmanager.yml.example
+new file mode 100644
+index 0000000..5cd03aa
+--- /dev/null
++++ b/alertmanager/alertmanager.yml.example
+@@ -0,0 +1,28 @@
++global:
++  resolve_timeout: 5m
++
++route:
++  receiver: "slack-notifications"
++  group_by: ["alertname", "service"]
++  group_wait: 10s
++  group_interval: 30s
++  repeat_interval: 1h
++
++receivers:
++  - name: "slack-notifications"
++    slack_configs:
++      - api_url: "https://hooks.slack.com/services/REPLACE/WITH/YOUR_WEBHOOK"
++        channel: "#alerts"
++        send_resolved: true
++        title: '{{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
++        text: >-
++          {{ range .Alerts }}
++          *Service:* {{ .Labels.service }}{{ if .Labels.job }}{{ .Labels.job }}{{ end }}
++          *Summary:* {{ .Annotations.summary }}
++          *Description:* {{ .Annotations.description }}
++          {{ end }}
++
++inhibit_rules:
++  - source_matchers: ["severity=critical"]
++    target_matchers: ["severity=warning"]
++    equal: ["alertname", "service"]
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 3e49131..e76e29a 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -76,6 +76,24 @@ services:
+     command:
+       - '--config.file=/etc/prometheus/prometheus.yml'
+       - '--storage.tsdb.path=/prometheus'
++    depends_on:
++      - alertmanager
++    restart: unless-stopped
++    networks:
++      - frontend
++      - backend
++
++  alertmanager:
++    image: prom/alertmanager:v0.27.0
++    container_name: alertmanager
++    ports:
++      - "9093:9093"
++    volumes:
++      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
++      - alertmanager-data:/alertmanager
++    command:
++      - '--config.file=/etc/alertmanager/alertmanager.yml'
++      - '--storage.path=/alertmanager'
+     restart: unless-stopped
+     networks:
+       - frontend
+@@ -120,3 +138,4 @@ networks:
+ volumes:
+   prometheus-data:
+   grafana-data:
++  alertmanager-data:
+diff --git a/docs/architecture.md b/docs/architecture.md
+index 43288e5..47021ae 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -48,9 +48,10 @@ Services (stdout, structured JSON) --> docker compose logs
+ Each log line includes service, level, request_id, and trace_id for correlation across MELT signals.
+ 
+ ### Alerting Flow
+-Prometheus Rules (alert-rules.yml) --> Alertmanager state --> Prometheus /api/v1/alerts --> Grafana Dashboard
++Prometheus Rules (alert-rules.yml) --> Alertmanager (:9093) --> Slack channel via webhook
++Prometheus evaluates the rules in alert-rules.yml and forwards firing alerts to Alertmanager, which groups them and routes them to Slack using the webhook configured in `alertmanager/alertmanager.yml`. Alerts also remain visible via Prometheus (`/alerts`) and Grafana as before.
+ 
+ ## Known Limitations
+ 1. Logs are not centralized in Loki -- viewed via docker compose logs SERVICE_NAME
+-2. No Alertmanager notification routing configured (Slack/email/webhook) -- alerts are visible via Prometheus and Grafana only
++2. `docker-compose.prod.yml` (the CI/CD deployment path) does not include Prometheus, Grafana, Jaeger, or Alertmanager -- the observability/alerting stack currently only runs via `docker-compose.yml` for local/dev use. This should be addressed before relying on Slack alerting in a deployed environment.
+ 3. Tracing uses the legacy Jaeger Thrift exporter rather than OTLP (deprecation warning present in service logs; functionally correct but should be migrated for production use)
+diff --git a/prometheus.yml b/prometheus.yml
+index cae2c39..e4b807a 100644
+--- a/prometheus.yml
++++ b/prometheus.yml
+@@ -5,6 +5,12 @@ global:
+ rule_files:
+   - /etc/prometheus/alert-rules.yml
+ 
++alerting:
++  alertmanagers:
++    - static_configs:
++        - targets:
++            - alertmanager:9093
++
+ scrape_configs:
+   - job_name: 'prometheus'
+     static_configs:

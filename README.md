@@ -93,6 +93,41 @@ k6 run scripts/load-test.js
 | HighErrorRate | Error rate > 10% for 30s | warning |
 | HighLatency | p95 latency > 1s for 1m | warning |
 
+### Slack Alerting (Alertmanager)
+
+Alerts defined in `alert-rules.yml` are evaluated by Prometheus and routed through
+**Alertmanager** to a Slack channel via an incoming webhook.
+
+**One-time setup (per person running the stack):**
+
+1. In Slack, create an [Incoming Webhook](https://api.slack.com/messaging/webhooks) for the channel you want alerts posted to (e.g. `#alerts`). Copy the webhook URL.
+2. Copy the template config:
+   ```bash
+   cp alertmanager/alertmanager.yml.example alertmanager/alertmanager.yml
+   ```
+3. Edit `alertmanager/alertmanager.yml` and replace the placeholder `api_url` with your real Slack webhook URL.
+4. `alertmanager/alertmanager.yml` is gitignored -- it will never be committed, so your webhook URL stays private.
+5. Start (or restart) the stack:
+   ```bash
+   docker compose up -d
+   ```
+
+**Verify it works:**
+
+```bash
+# Trigger a controlled failure so ServiceDown or HighErrorRate fires
+curl http://localhost:8080/service-a/fail
+curl http://localhost:8080/service-a/fail
+curl http://localhost:8080/service-a/fail
+
+# Check Alertmanager sees it
+curl http://localhost:9093/api/v2/alerts
+```
+
+Access Alertmanager's UI at http://localhost:9093 to see alert grouping and routing state. Within a few seconds of an alert firing, you should see it posted to your configured Slack channel.
+
+> **Note:** `docker-compose.prod.yml` (used by the CI/CD deployment path) does not currently include Prometheus/Alertmanager/Grafana/Jaeger -- this alerting setup applies to the local dev stack (`docker-compose.yml`). Extending the production compose file to include monitoring is a good next step before relying on this in a deployed environment.
+
 ## For Reviewers
 
 This section maps directly to the assignment's peer-review checklist. Each item below can be verified independently in under a few minutes -- no source code trust required.

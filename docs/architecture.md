@@ -48,9 +48,10 @@ Services (stdout, structured JSON) --> docker compose logs
 Each log line includes service, level, request_id, and trace_id for correlation across MELT signals.
 
 ### Alerting Flow
-Prometheus Rules (alert-rules.yml) --> Alertmanager state --> Prometheus /api/v1/alerts --> Grafana Dashboard
+Prometheus Rules (alert-rules.yml) --> Alertmanager (:9093) --> Slack channel via webhook
+Prometheus evaluates the rules in alert-rules.yml and forwards firing alerts to Alertmanager, which groups them and routes them to Slack using the webhook configured in `alertmanager/alertmanager.yml`. Alerts also remain visible via Prometheus (`/alerts`) and Grafana as before.
 
 ## Known Limitations
 1. Logs are not centralized in Loki -- viewed via docker compose logs SERVICE_NAME
-2. No Alertmanager notification routing configured (Slack/email/webhook) -- alerts are visible via Prometheus and Grafana only
+2. `docker-compose.prod.yml` (the CI/CD deployment path) does not include Prometheus, Grafana, Jaeger, or Alertmanager -- the observability/alerting stack currently only runs via `docker-compose.yml` for local/dev use. This should be addressed before relying on Slack alerting in a deployed environment.
 3. Tracing uses the legacy Jaeger Thrift exporter rather than OTLP (deprecation warning present in service logs; functionally correct but should be migrated for production use)
