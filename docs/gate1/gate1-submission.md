@@ -1,6 +1,6 @@
 # Gate 1 Submission — ECS on Fargate Lab
 
-**Group 2** | **Region:** us-east-2 | No AWS resources created before this review
+**Group 2** | **Region:** us-east-2 | No resources created before this review
 
 ---
 
@@ -11,36 +11,15 @@
 | Patricia (Person A) | Platform (ECS cluster, Service Connect namespace, ALB, CodeConnections) + Service A |
 | Pearl (Person B) | Service B + Service C |
 
-Rule: each owner may advise on another member's service but never operates their console. With two members, the platform role is not rotated separately — Patricia holds Platform alongside Service A.
+Rule: each owner may advise on another member's service but never operates their console. Since the team has two members, the platform role is not rotated separately — Patricia holds Platform alongside Service A.
 
 ---
 
 ## 2. Dependency graph
 
-```mermaid
-flowchart TD
-    A[IAM identity] --> B[Region: us-east-2]
-    B --> C["VPC & subnets (2 AZs: 2a, 2b)"]
-    C --> D[Security groups]
-    D --> E[ECR repositories]
-    E --> F[ECS cluster]
-    F --> G["Task definitions (CPU/mem, roles, port)"]
-    G --> H[ECS services]
-    H --> I["Service Connect (group2.internal)"]
-    I --> J[Target group]
-    J --> K[Load balancer ALB]
-    K --> L[DNS]
+Core chain: IAM identity → Region (us-east-2) → VPC & subnets (2 AZs) → Security groups → ECR repositories → ECS cluster → Task definitions → ECS services → Service Connect → Target group → Load balancer (ALB) → DNS.
 
-    CC[CodeConnections] --> E
-    CC --> CP[CodePipeline]
-    CP --> CB[CodeBuild]
-    CB --> ED[ECS deployment]
-    ED --> H
-
-    CW[CloudWatch Logs] --> G
-```
-
-**Attached branches:**
+Attached branches:
 - **CloudWatch Logs** — attached to Task definitions (where container log output is configured).
 - **CI/CD pipeline** — CodeConnections → CodePipeline → CodeBuild → feeds a new image into ECR; the resulting ECS deployment feeds into ECS services. Each service (A, B, C) will have its own CodeBuild project and buildspec, all sharing the one CodeConnections connection.
 
@@ -71,7 +50,7 @@ flowchart TD
 
 ## 5. Traffic contracts
 
-Protocol is HTTP throughout. Health endpoint is `/health` on every service. Timeout matches `curl --max-time 5` used in later test phases, so 5 seconds is used consistently below.
+Protocol is HTTP throughout. Health endpoint is `/health` on every service. Timeout matches the `curl --max-time 5` used in later test phases, so 5 seconds is used consistently below.
 
 | Source | Destination | Protocol | Port | Service name | Health endpoint | Timeout | Allowed? | Enforcement |
 |---|---|---|---|---|---|---|---|---|
@@ -103,7 +82,7 @@ No other application path is permitted — the only allowed edges are Internet�
 
 Required tags on every resource: `Project=devops-mentorship`, `Group=group-2`, `Owner=<role e.g. platform-owner, service-a-owner>`, `Environment=lab`.
 
-**Namespace naming decision:** using `group2.internal` per the assignment's example format (Section 3.1: *"Create: group<group-number>.internal"*), rather than the `devops-g2-` resource prefix, since a Service Connect namespace is a DNS namespace rather than a taggable AWS resource. Flagged to the instructor for confirmation before creation.
+**Open question for the instructor:** should the Service Connect namespace follow the `devops-g2-` resource prefix (e.g. `devops-g2.internal`) or stay as `group2.internal` per the assignment's own example format? We will confirm before creating it.
 
 ---
 
