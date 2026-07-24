@@ -26,3 +26,14 @@
 - **Actual cause**: no security-group rule permits service-c to reach service-a (port 3001) — correctly so, since our Gate 1 traffic contract explicitly denies any C-to-A path (and A-to-C)
 - **Decision**: left as-is. Adding a C-to-A security-group rule would violate our documented, Gate-1-approved traffic contract. The callback failure is an accepted limitation of a demo endpoint not required by this assignment's traffic contract
 - **Prevention**: if this callback pattern is ever required by a future assignment phase, it needs an explicit Gate-reviewed traffic-contract update first, not a silent SG change
+
+## Phase 4: Kill-a-task drill results
+
+- **Setup**: continuous curl loop (1 req/sec) against ALB /health, desiredCount=2 for Service A
+- **Action**: stopped one Service A task manually (task 42c7469a...) via aws ecs stop-task
+- **Observed**: zero failed requests (all status=200); two latency spikes — 0.96s and 0.82s during draining, one 5.56s spike likely from a request landing on the task mid-shutdown; recovered to baseline (~0.45-0.5s) within seconds, well before the replacement task finished
+- **ECS timeline**: deregistered from target group (20:28:58.600) -> began draining connections (20:28:58.606) -> new task started (20:28:59.510) -> new task registered healthy in target group (20:29:46.750) = ~48s total recovery window
+- **Why ECS replaced the task**: desiredCount=2 is continuously reconciled against actual running count; ECS scheduled a replacement the moment the stopped task was detected
+- **Why the ALB avoided serving an unhealthy target**: target deregistration + connection draining removed the dying task from rotation immediately, routing all new requests to the surviving healthy target
+- **Service Connect impact**: none required — services are addressed by name (service-a in group2.internal), not by IP, so the replacement task registered automatically under the same identity
+- **What changes at desiredCount=1**: with only one task, there would be zero healthy targets during the ~48s replacement window, producing real failed requests (502/504) instead of latency wobble — this is exactly why Service A specifically runs desiredCount=2
