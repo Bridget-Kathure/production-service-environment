@@ -83,3 +83,9 @@ Verified: `curl -i http://devops-g2-alb-587868346.us-east-2.elb.amazonaws.com/he
 | Repository | `Bridget-Kathure/production-service-environment` |
 
 Note: required Admin-level GitHub access to authorize the App installation — a Write/Maintain collaborator role isn't sufficient for this step.
+
+## Branch protection (Phase 5)
+
+Rule created on `main`: require PR before merging, require 1 approval, direct pushes blocked (including for admins).
+
+Verified by direct test: a push straight to `main` was rejected with `GH006: Protected branch update failed... Changes must be made through a pull request.`
