@@ -9,7 +9,7 @@
   "containerDefinitions": [
     {
       "name": "service-c",
-      "image": "827478161993.dkr.ecr.us-east-2.amazonaws.com/devops-g2-service-c:latest",
+      "image": "827478161993.dkr.ecr.us-east-2.amazonaws.com/devops-g2-service-c:43fe4bc",
       "essential": true,
       "portMappings": [
         {
