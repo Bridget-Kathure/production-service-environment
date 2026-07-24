@@ -72,3 +72,14 @@ Service A's is `/ecs/devops-g2-service-a` — create matching ones for B and C.
 | Listener | HTTP :80 → forwards to `devops-g2-tg` |
 
 Verified: `curl -i http://devops-g2-alb-587868346.us-east-2.elb.amazonaws.com/health` returns `200 OK` with Service A's health JSON.
+
+## CodeConnections (Phase 5)
+
+| Field | Value |
+|---|---|
+| Connection name | `devops-g2-github` |
+| Connection ARN | `arn:aws:codeconnections:us-east-2:827478161993:connection/d36616c8-fafb-4250-8ce4-eaa67456cbc5` |
+| Status | Available |
+| Repository | `Bridget-Kathure/production-service-environment` |
+
+Note: required Admin-level GitHub access to authorize the App installation — a Write/Maintain collaborator role isn't sufficient for this step.
