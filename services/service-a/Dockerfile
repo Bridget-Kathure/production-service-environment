@@ -2,6 +2,9 @@ FROM python:3.12.13-slim
 
 WORKDIR /app
 
+ARG GIT_SHA=unknown
+ENV GIT_SHA=${GIT_SHA}
+
 # Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
