@@ -518,3 +518,4 @@ Not Allowed: `latest`, `main`, `dev`
 | Can't reach service | Wrong hostname | Use service-b, not localhost |
 | Build fails | Missing requirements.txt | Ensure file is in repo root |
 | Logs empty | Service crashed | docker-compose logs --tail 50 <service> |
+test
