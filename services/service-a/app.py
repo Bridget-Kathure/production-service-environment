@@ -115,7 +115,7 @@ async def health(request: Request):
         "status": "healthy",
         "port": 3001,
         "uptime_seconds": uptime,
-        "version": GIT_SHA
+        "version": GIT_SHA,
         "check_type": "liveness",
     }
 
