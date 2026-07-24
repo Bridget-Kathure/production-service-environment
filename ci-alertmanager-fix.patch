@@ -1,0 +1,14 @@
+diff --git a/.github/workflows/container-ci-cd.yml b/.github/workflows/container-ci-cd.yml
+index 5929fdf..63a8e00 100644
+--- a/.github/workflows/container-ci-cd.yml
++++ b/.github/workflows/container-ci-cd.yml
+@@ -63,6 +63,9 @@ jobs:
+       - name: Build Compose stack
+         run: docker compose build --pull
+ 
++      - name: Create Alertmanager config for CI
++        run: cp alertmanager/alertmanager.yml.example alertmanager/alertmanager.yml
++
+       - name: Start Compose stack
+         run: docker compose up -d
+ 

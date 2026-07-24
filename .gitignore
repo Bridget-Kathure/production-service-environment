@@ -33,3 +33,6 @@ Thumbs.db
 
 # Git
 .git/
+
+# Alertmanager (contains real Slack webhook URL - never commit)
+alertmanager/alertmanager.yml

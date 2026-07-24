@@ -63,6 +63,9 @@ jobs:
       - name: Build Compose stack
         run: docker compose build --pull
 
+      - name: Create Alertmanager config for CI
+        run: cp alertmanager/alertmanager.yml.example alertmanager/alertmanager.yml
+
       - name: Start Compose stack
         run: docker compose up -d
 
