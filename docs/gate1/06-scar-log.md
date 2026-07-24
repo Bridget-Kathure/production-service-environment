@@ -55,3 +55,13 @@
 - **Actual cause**: CodeBuild's underlying integration still checks the legacy `codestar-connections` IAM namespace (the service was renamed to CodeConnections, but permission checks for some actions haven't fully migrated) — the codeconnections:* actions alone were insufficient
 - **Repair**: added the equivalent codestar-connections:GetConnection, codestar-connections:UseConnection, codestar-connections:GetConnectionToken actions to the CodeBuild role's policy, alongside the codeconnections:* ones
 - **Prevention**: when granting CodeBuild/CodePipeline access to a CodeConnections connection, include both codeconnections:* and codestar-connections:* actions on the role — this will apply to Pearl's Service B/C CodeBuild roles too
+
+## Scar: CodePipeline V2 Git triggers not firing automatically on merge (shared issue with Pearl)
+
+- **Symptom**: merges to main never automatically started a pipeline execution on either Service A (Patricia) or Service B (Pearl) pipelines. Every execution in history was triggerType StartPipelineExecution (manual) or CreatePipeline (initial), never an automatic push-based trigger
+- **First hypothesis**: missing trigger configuration on the pipeline
+- **Evidence**: confirmed via `get-pipeline` that a correctly-formed `triggers` block (CodeStarSourceConnection provider, gitConfiguration watching pushes to main) was present and persisted on Service A's pipeline. Also tried changing executionMode from SUPERSEDED to QUEUED (per AWS docs suggesting QUEUED is required for reliable trigger-based execution) -- still no automatic trigger fired after two separate real merges (PR #20, PR #21)
+- **Cross-check**: independently verified the same failure on Pearl's Service B pipeline (her branch pearl/verify-detectchanges-fix shows she attempted the same fix independently) -- ruling out an individual configuration mistake
+- **Actual cause**: unresolved -- likely an account-level or environment-level limitation on this lab account's CodeConnections-to-CodePipeline event delivery, not a mistake in either team member's pipeline JSON
+- **Workaround in use**: manual `aws codepipeline start-pipeline-execution` after each merge, until/unless the trigger issue is resolved
+- **Prevention/next step**: flagged to instructor as a potential platform-level constraint; both team members have independently confirmed correct trigger configuration per AWS documentation
