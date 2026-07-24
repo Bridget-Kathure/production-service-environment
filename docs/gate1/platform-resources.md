@@ -60,3 +60,15 @@ Service A's is `/ecs/devops-g2-service-a` — create matching ones for B and C.
 ---
 
 *Last updated after Service A checkpoint verification (task RUNNING, HEALTHY, logs visible, SHA visible, ECS Exec working).*
+
+## ALB (added post-wiring)
+
+| Field | Value |
+|---|---|
+| ALB name | `devops-g2-alb` |
+| ALB DNS | `devops-g2-alb-587868346.us-east-2.elb.amazonaws.com` |
+| ALB security group | `sg-02f1f76b56f71897b` |
+| Target group | `devops-g2-tg` (registers Service A only, port 3001) |
+| Listener | HTTP :80 → forwards to `devops-g2-tg` |
+
+Verified: `curl -i http://devops-g2-alb-587868346.us-east-2.elb.amazonaws.com/health` returns `200 OK` with Service A's health JSON.
