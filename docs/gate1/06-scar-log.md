@@ -37,3 +37,12 @@
 - **Why the ALB avoided serving an unhealthy target**: target deregistration + connection draining removed the dying task from rotation immediately, routing all new requests to the surviving healthy target
 - **Service Connect impact**: none required — services are addressed by name (service-a in group2.internal), not by IP, so the replacement task registered automatically under the same identity
 - **What changes at desiredCount=1**: with only one task, there would be zero healthy targets during the ~48s replacement window, producing real failed requests (502/504) instead of latency wobble — this is exactly why Service A specifically runs desiredCount=2
+
+## Sabotage round: Service C nonexistent image tag (diagnosed by Patricia)
+
+- **Symptom**: service-c stuck at running=1, desired=1, pending=1 indefinitely
+- **First hypothesis**: task placement or capacity issue
+- **Evidence**: describe-services events showed repeated CannotPullContainerError referencing image tag 9f8e7d6c; diffed task-definition revision 2 vs 3 and found the image tag was the only change (43fe4bc -> 9f8e7d6c)
+- **Actual cause**: Pearl's sabotage round injection — task definition revision 3 pointed at a nonexistent ECR image tag
+- **Repair**: rolled service-c back to task-definition revision 2 (known-good image 43fe4bc) via update-service + force-new-deployment; confirmed via service events that new task started and sabotaged task was stopped
+- **Prevention**: this is exactly why image tags should always be verified against `aws ecr describe-images` before registering a new task-definition revision
