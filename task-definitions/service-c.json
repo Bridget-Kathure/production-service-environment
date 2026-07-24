@@ -1,0 +1,45 @@
+{
+  "family": "devops-g2-service-c",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::827478161993:role/devops-g2-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::827478161993:role/devops-g2-ecs-task-role",
+  "containerDefinitions": [
+    {
+      "name": "service-c",
+      "image": "827478161993.dkr.ecr.us-east-2.amazonaws.com/devops-g2-service-c:43fe4bc",
+      "essential": true,
+      "portMappings": [
+        {
+          "name": "service-c",
+          "containerPort": 3003,
+          "protocol": "tcp",
+          "appProtocol": "http"
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:3003/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/devops-g2-service-c",
+          "awslogs-region": "us-east-2",
+          "awslogs-stream-prefix": "service-c"
+        }
+      }
+    }
+  ],
+  "tags": [
+    { "key": "Project", "value": "devops-mentorship" },
+    { "key": "Group", "value": "group-2" },
+    { "key": "Owner", "value": "service-c-owner" },
+    { "key": "Environment", "value": "lab" }
+  ]
+}

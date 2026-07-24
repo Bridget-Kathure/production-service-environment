@@ -8,8 +8,11 @@ import time
 import asyncio
 import random
 import threading
+import os
 from datetime import datetime, timezone
 from logger import get_logger
+
+VERSION = os.environ.get("GIT_SHA", "unknown")
 
 # Jaeger / OpenTelemetry tracing
 from opentelemetry import trace
@@ -154,6 +157,7 @@ async def health(request: Request):
     })
     return {
         "service": "service-c",
+        "version": VERSION,
         "status": "healthy",
         "port": 3003,
         "uptime_seconds": uptime,
