@@ -46,3 +46,12 @@
 - **Actual cause**: Pearl's sabotage round injection — task definition revision 3 pointed at a nonexistent ECR image tag
 - **Repair**: rolled service-c back to task-definition revision 2 (known-good image 43fe4bc) via update-service + force-new-deployment; confirmed via service events that new task started and sabotaged task was stopped
 - **Prevention**: this is exactly why image tags should always be verified against `aws ecr describe-images` before registering a new task-definition revision
+
+## Scar: CodeBuild access denied to CodeConnections despite correct IAM policy
+
+- **Symptom**: CodeBuild failed immediately at DOWNLOAD_SOURCE with "Access denied to connection ...", despite the CodeBuild role having codeconnections:GetConnection and codeconnections:UseConnection explicitly granted
+- **First hypothesis**: missing resource-based policy on the CodeConnections connection itself
+- **Evidence**: `aws codeconnections help` showed no get-resource-policy/put-resource-policy commands exist at all for this service — ruling out a resource-policy-based fix
+- **Actual cause**: CodeBuild's underlying integration still checks the legacy `codestar-connections` IAM namespace (the service was renamed to CodeConnections, but permission checks for some actions haven't fully migrated) — the codeconnections:* actions alone were insufficient
+- **Repair**: added the equivalent codestar-connections:GetConnection, codestar-connections:UseConnection, codestar-connections:GetConnectionToken actions to the CodeBuild role's policy, alongside the codeconnections:* ones
+- **Prevention**: when granting CodeBuild/CodePipeline access to a CodeConnections connection, include both codeconnections:* and codestar-connections:* actions on the role — this will apply to Pearl's Service B/C CodeBuild roles too
