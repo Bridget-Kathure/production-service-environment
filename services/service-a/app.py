@@ -8,6 +8,7 @@ import time
 import asyncio
 import random
 from logger import get_logger
+import os
 
 # Jaeger / OpenTelemetry tracing
 from opentelemetry import trace
@@ -20,6 +21,7 @@ from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapProp
 app = FastAPI()
 logger = get_logger("service-a")
 START_TIME = time.time()
+GIT_SHA = os.environ.get("GIT_SHA", "unknown")
 
 # Initialize Jaeger tracing
 resource = Resource(attributes={SERVICE_NAME: "service-a"})
@@ -105,14 +107,16 @@ async def health(request: Request):
         "request_id": request_id,
         "path": "/health",
         "status": 200,
-        "method": "GET"
+        "method": "GET",
+        
     })
     return {
         "service": "service-a",
         "status": "healthy",
         "port": 3001,
         "uptime_seconds": uptime,
-        "check_type": "liveness"
+        "version": GIT_SHA
+        "check_type": "liveness",
     }
 
 @app.get("/ready")
