@@ -99,6 +99,7 @@ async def metrics_middleware(request: Request, call_next):
 async def metrics():
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
+# Gate 3A verification: hands-off deploy via CodePipeline/EventBridge
 @app.get("/health")
 async def health(request: Request):
     request_id = str(uuid.uuid4())
