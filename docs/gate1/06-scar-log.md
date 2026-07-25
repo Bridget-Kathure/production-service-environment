@@ -73,3 +73,12 @@
 - **Fix**: added production-service-environment to the app's repository access list via Configure -> Select repositories -> Save
 - **Verified**: next merge to main produced a new pipeline execution with triggerType "WebhookV2" (vs previous manual "StartPipelineExecution"), confirming genuine automatic hands-off deployment
 - **Prevention**: when setting up CodeConnections/GitHub App integration, explicitly verify the GitHub App's repository access includes the target repo at github.com/settings/installations -- the AWS-side connection can show "Available" and work for manual actions even when the underlying GitHub App has never been granted access to send push events for that specific repo
+
+## Gate 3B: Automatic rollback confirmed working
+
+- **Setup**: registered task-definition revision 7 with a deliberately broken health check path (/health -> /healthz), same image (d4a93bd) as the known-good revision 6. Ran continuous 1 req/sec traffic against the ALB throughout.
+- **Failure**: both replacement tasks on revision 7 failed container health checks (confirmed via ECS events: "failed container health checks"). Circuit breaker gave up after 4 total failed task attempts.
+- **Circuit breaker evidence** (verbatim from ECS): "ECS deployment circuit breaker: tasks failed to start" (revision 7, rollout FAILED) and "ECS deployment circuit breaker: rolling back to deploymentId ecs-svc/0116120054183299912" (revision 6, rollout IN_PROGRESS -> COMPLETED)
+- **Recovery**: service returned to revision 6, running 2/2, zero manual intervention
+- **User-visible impact**: zero failed or non-200 requests across the entire ~23 minute drill (continuous 1 req/sec curl loop) -- broken tasks never passed health checks, so they were never registered with the ALB target group and never received live traffic
+- **Verified**: curl against the ALB after recovery returns version "d4a93bd" (known-good SHA), status healthy
