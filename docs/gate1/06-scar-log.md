@@ -65,3 +65,11 @@
 - **Actual cause**: unresolved -- likely an account-level or environment-level limitation on this lab account's CodeConnections-to-CodePipeline event delivery, not a mistake in either team member's pipeline JSON
 - **Workaround in use**: manual `aws codepipeline start-pipeline-execution` after each merge, until/unless the trigger issue is resolved
 - **Prevention/next step**: flagged to instructor as a potential platform-level constraint; both team members have independently confirmed correct trigger configuration per AWS documentation
+
+## Resolution: CodePipeline auto-trigger root cause found
+
+- **Root cause identified**: the AWS Connector for GitHub app (installed under Bridget's GitHub account) was scoped to "Only select repositories" -> Bridget-Kathure/Final-Stand-Admin-Dashboard, an unrelated repo. It was never granted access to production-service-environment, so GitHub never sent push-event notifications to AWS for this repo -- despite the CodeConnections connection itself showing "Available" and working fine for manual/Source-stage pulls
+- **How found**: checked github.com/{repo}/settings/webhooks (empty -- expected for App-based integrations, not the actual gap) then github.com/settings/installations (account-level view) -> found AWS Connector for GitHub installed but scoped to the wrong repository entirely
+- **Fix**: added production-service-environment to the app's repository access list via Configure -> Select repositories -> Save
+- **Verified**: next merge to main produced a new pipeline execution with triggerType "WebhookV2" (vs previous manual "StartPipelineExecution"), confirming genuine automatic hands-off deployment
+- **Prevention**: when setting up CodeConnections/GitHub App integration, explicitly verify the GitHub App's repository access includes the target repo at github.com/settings/installations -- the AWS-side connection can show "Available" and work for manual actions even when the underlying GitHub App has never been granted access to send push events for that specific repo
