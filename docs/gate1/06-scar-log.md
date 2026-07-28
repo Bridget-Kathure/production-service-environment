@@ -47,6 +47,15 @@
 - **Repair**: rolled service-c back to task-definition revision 2 (known-good image 43fe4bc) via update-service + force-new-deployment; confirmed via service events that new task started and sabotaged task was stopped
 - **Prevention**: this is exactly why image tags should always be verified against `aws ecr describe-images` before registering a new task-definition revision
 
+## Sabotage round: Service A wrong health-check path (diagnosed by Pearl)
+
+- **Symptom**: Service A stuck in a continuous redeploy loop — every new task started, then failed its container health check and got replaced, repeating indefinitely on task-definition revision 2
+- **First hypothesis**: application-level crash or a broken dependency in the image itself, since the task was starting but never reaching HEALTHY
+- **Evidence**: `describe-services` events showed the same cycle repeating — "failed container health checks" → target deregistered → task stopped → new task started — always on revision 2. Diffed `describe-task-definition` output for revision 1 (last known-good) against revision 2 side by side: image URI and port mapping were byte-for-byte identical; only the `healthCheck.command` field differed
+- **Actual cause**: revision 2's health check was changed from `http://localhost:3001/health` to `http://localhost:3001/healthz` — that endpoint doesn't exist on Service A, so every check failed by design
+- **Repair**: left for Patricia to fix on her own service per the "advise, don't operate" rule; diagnosis and evidence were reported to her directly instead
+- **Prevention**: when a service is stuck redeploying without any application or image change, diff consecutive task-definition revisions before assuming the problem is in the container — a one-line config drift (like a health-check path) produces identical symptoms to a real application crash
+
 ## Scar: CodeBuild access denied to CodeConnections despite correct IAM policy
 
 - **Symptom**: CodeBuild failed immediately at DOWNLOAD_SOURCE with "Access denied to connection ...", despite the CodeBuild role having codeconnections:GetConnection and codeconnections:UseConnection explicitly granted
