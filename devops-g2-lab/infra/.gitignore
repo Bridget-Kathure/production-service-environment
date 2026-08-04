@@ -1,0 +1,10 @@
+# Terraform state & local files — NEVER commit
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+crash.log
+*.pem
+*.key
+*.env
+.terraform.tfstate.lock.info
