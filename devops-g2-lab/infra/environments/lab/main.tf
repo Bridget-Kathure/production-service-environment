@@ -109,15 +109,6 @@ resource "aws_security_group_rule" "a_from_alb" {
 }
 
 # Service A -> Service B
-resource "aws_security_group_rule" "a_to_b" {
-  type                     = "egress"
-  from_port                = 3002
-  to_port                  = 3002
-  protocol                 = "tcp"
-  source_security_group_id = module.service_b.security_group_id
-  security_group_id        = module.service_a.security_group_id
-  description              = "Service A to Service B"
-}
 
 # Service B <- Service A
 resource "aws_security_group_rule" "b_from_a" {
@@ -131,15 +122,6 @@ resource "aws_security_group_rule" "b_from_a" {
 }
 
 # Service B -> Service C
-resource "aws_security_group_rule" "b_to_c" {
-  type                     = "egress"
-  from_port                = 3003
-  to_port                  = 3003
-  protocol                 = "tcp"
-  source_security_group_id = module.service_c.security_group_id
-  security_group_id        = module.service_b.security_group_id
-  description              = "Service B to Service C"
-}
 
 # Service C <- Service B
 resource "aws_security_group_rule" "c_from_b" {
