@@ -15,13 +15,7 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  egress {
-    description = "To Service A"
-    from_port   = var.app_port
-    to_port     = var.app_port
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  # No inline egress - proper SG-referenced egress added in main.tf
 
   tags = {
     Name  = "${local.name_prefix}-alb-sg-iac"

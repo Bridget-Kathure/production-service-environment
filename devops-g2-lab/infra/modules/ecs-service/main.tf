@@ -1,7 +1,7 @@
 locals {
   name_prefix = "devops-${var.group_number}"
   full_name   = "${local.name_prefix}-service-${var.service_name}"
-  ecr_repo    = "${local.name_prefix}-service-${var.service_name}"
+  ecr_repo    = "${local.name_prefix}-service-${var.service_name}-iac"
   port_name   = "${local.full_name}-port"
 }
 
@@ -46,16 +46,6 @@ resource "aws_security_group" "main" {
   }
 }
 
-resource "aws_security_group_rule" "ingress" {
-  count                    = var.ingress_sg_id != "" ? 1 : 0
-  type                     = "ingress"
-  from_port                = var.app_port
-  to_port                  = var.app_port
-  protocol                 = "tcp"
-  source_security_group_id = var.ingress_sg_id
-  security_group_id        = aws_security_group.main.id
-  description              = "From upstream service"
-}
 
 resource "aws_ecs_task_definition" "main" {
   family                   = local.full_name
@@ -134,10 +124,10 @@ resource "aws_ecs_service" "main" {
       namespace = var.namespace_name
       service {
         port_name      = local.port_name
-        discovery_name = "service-${var.service_name}"
-        client_aliases {
+        discovery_name = "service-${var.service_name}-iac"
+        client_alias {
           port     = var.app_port
-          dns_name = "service-${var.service_name}"
+          dns_name = "service-${var.service_name}-iac"
         }
       }
     }
