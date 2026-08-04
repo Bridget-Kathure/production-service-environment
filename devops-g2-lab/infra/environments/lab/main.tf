@@ -14,3 +14,11 @@ module "alb" {
   app_port          = 3000
   owner             = "platform"
 }
+
+module "ecs_platform" {
+  source = "../../modules/ecs-platform"
+
+  group_number = "g2"
+  vpc_id       = module.network.vpc_id
+  owner        = "platform"
+}
