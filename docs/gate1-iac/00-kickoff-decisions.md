@@ -5,7 +5,7 @@
 | Item | Value |
 |---|---|
 | IaC tool | **Terraform** |
-| Terraform CLI | **v1.15.8** installed by both engineers; code constraint `>= 1.9.0` |
+| Terraform CLI | **v1.15.8** installed by both engineers; code constraint `>= 1.15.8, < 2.0.0` |
 | AWS provider source | `hashicorp/aws` |
 | AWS provider version pin | `~> 5.60` |
 | Lockfile | `.terraform.lock.hcl` committed after first `terraform init` |
@@ -15,7 +15,7 @@ Live in code today — `infra/bootstrap/main.tf` and `infra/environments/lab/ver
 
 ```hcl
 terraform {
-  required_version = ">= 1.9.0"
+  required_version = ">= 1.15.8, < 2.0.0"
 
   required_providers {
     aws = {

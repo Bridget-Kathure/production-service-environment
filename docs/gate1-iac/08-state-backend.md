@@ -34,7 +34,7 @@ Pins live in `infra/bootstrap/main.tf` and `infra/environments/lab/versions.tf`.
 
 ```hcl
 terraform {
-  required_version = ">= 1.9.0"
+  required_version = ">= 1.15.8, < 2.0.0"
 
   required_providers {
     aws = {
