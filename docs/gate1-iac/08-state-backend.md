@@ -26,7 +26,7 @@ Pins live in `infra/bootstrap/main.tf` and `infra/environments/lab/versions.tf`.
 | Encryption | SSE-KMS, customer-managed key (`alias/devops-g2-tfstate-key`), rotation enabled |
 | Versioning | Enabled |
 | Public access | Blocked (all four block-public-access settings) |
-| Locking | DynamoDB table `devops-g2-tfstate-lock`, `PAY_PER_REQUEST`, hash key `LockID` |
+| Locking | DynamoDB table `devops-g2-tfstate-lock`, `PAY_PER_REQUEST`, hash key `LockID` (see locking migration status below - workload backend now targets S3 native locking, pending reconfigure) |
 | Region | `us-east-2` |
 | Tags | `Project=devops-g2`, `Group=g2`, `Owner=platform`, `Environment=lab` |
 
@@ -34,7 +34,7 @@ Pins live in `infra/bootstrap/main.tf` and `infra/environments/lab/versions.tf`.
 
 ```hcl
 terraform {
-  required_version = ">= 1.9.0"
+  required_version = ">= 1.15.8, < 2.0.0"
 
   required_providers {
     aws = {
@@ -44,12 +44,12 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "devops-g2-tfstate-827478161993"
-    key            = "lab/workload.tfstate"
-    region         = "us-east-2"
-    encrypt        = true
-    kms_key_id     = "arn:aws:kms:us-east-2:827478161993:alias/devops-g2-tfstate-key"
-    dynamodb_table = "devops-g2-tfstate-lock"
+    bucket       = "devops-g2-tfstate-827478161993"
+    key          = "lab/workload.tfstate"
+    region       = "us-east-2"
+    encrypt      = true
+    kms_key_id   = "arn:aws:kms:us-east-2:827478161993:alias/devops-g2-tfstate-key"
+    use_lockfile = true
   }
 }
 
@@ -58,7 +58,7 @@ provider "aws" {
 }
 ```
 
-**Known deprecation, deliberately not yet resolved:** `dynamodb_table` triggers a deprecation warning in favor of `use_lockfile = true`. Kept as-is because the DynamoDB table is the real, already-deployed locking mechanism the team has been applying against; switching requires a coordinated migration, not a unilateral change to the backend block. Tracked as a follow-up decision, not an oversight.
+**Locking migration status (answers Group 10's peer review question):** the code above now specifies `use_lockfile = true` instead of the deprecated `dynamodb_table`. This is prepared, not yet applied: it only takes effect after `terraform init -reconfigure` against the real backend, which needs AWS credentials we don't currently have. Until that reconfigure is run, the actually-deployed backend is still using the DynamoDB table (`devops-g2-tfstate-lock`, created in `bootstrap/main.tf`). That table stays in place until the reconfigure is confirmed working - it isn't a permanent choice, and it isn't being removed pre-emptively either.
 
 ## Safety
 

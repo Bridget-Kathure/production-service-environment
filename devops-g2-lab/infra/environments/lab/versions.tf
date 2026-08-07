@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.9.0"
+  required_version = ">= 1.15.8, < 2.0.0"
 
   required_providers {
     aws = {
@@ -9,12 +9,20 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "devops-g2-tfstate-827478161993"
-    key            = "lab/workload.tfstate"
-    region         = "us-east-2"
-    encrypt        = true
-    kms_key_id     = "arn:aws:kms:us-east-2:827478161993:alias/devops-g2-tfstate-key"
-    dynamodb_table = "devops-g2-tfstate-lock"
+    bucket       = "devops-g2-tfstate-827478161993"
+    key          = "lab/workload.tfstate"
+    region       = "us-east-2"
+    encrypt      = true
+    kms_key_id   = "arn:aws:kms:us-east-2:827478161993:alias/devops-g2-tfstate-key"
+    use_lockfile = true
+    # Migrated from dynamodb_table (deprecated) to native S3 locking.
+    # NOT YET APPLIED: this only takes effect after `terraform init
+    # -reconfigure` against the real backend, which needs AWS
+    # credentials we don't currently have. Until that's run, the
+    # actually-deployed backend is still using the DynamoDB table
+    # (devops-g2-tfstate-lock, created in bootstrap/main.tf). That
+    # table is left in place on purpose - safe to remove in a future
+    # cost sweep once the reconfigure is confirmed working, not before.
   }
 }
 
