@@ -4,9 +4,9 @@ env:
   variables:
     AWS_REGION: "us-east-2"
     AWS_ACCOUNT_ID: "827478161993"
-    ECR_REPO: "devops-g2-service-b"
-    CONTAINER_NAME: "service-b"
-    SERVICE_PATH: "services/service-b"
+    ECR_REPO: "devops-g2-service-b-iac"
+    CONTAINER_NAME: "devops-g2-service-b"
+    SERVICE_PATH: "devops-g2-lab/service-b"
 
 phases:
   install:
