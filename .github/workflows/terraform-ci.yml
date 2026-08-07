@@ -1,0 +1,81 @@
+name: Terraform CI
+
+# Automates the "Predict -> Plan -> Review" checks from the Gate 1 workflow
+# for devops-g2-lab/infra: fmt, validate, and the native architecture tests.
+# None of these steps require AWS credentials - verified interactively
+# during Gate 1 review. `plan`/`apply` against the real S3 backend are
+# intentionally NOT included here; those need live credentials and human
+# review per the assignment's plan-discipline rules, not an auto-apply.
+
+on:
+  pull_request:
+    paths:
+      - "devops-g2-lab/infra/**"
+  push:
+    branches: [main]
+    paths:
+      - "devops-g2-lab/infra/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Pinned to match the version verified locally during Gate 1 review.
+  TF_VERSION: "1.15.8"
+
+jobs:
+  fmt:
+    name: terraform fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform fmt -check
+        working-directory: devops-g2-lab/infra
+        run: terraform fmt -recursive -check -diff
+
+  validate:
+    name: terraform validate (environments/lab)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      # -backend=false: no AWS credentials available/needed here. This only
+      # exercises fmt/type-checking, not the real S3 backend or live state.
+      - name: terraform init (no backend)
+        working-directory: devops-g2-lab/infra/environments/lab
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        working-directory: devops-g2-lab/infra/environments/lab
+        run: terraform validate
+
+  test:
+    name: terraform test (mocked provider, no AWS creds)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform init
+        working-directory: devops-g2-lab/infra
+        run: terraform init
+
+      - name: terraform test
+        working-directory: devops-g2-lab/infra
+        run: terraform test
