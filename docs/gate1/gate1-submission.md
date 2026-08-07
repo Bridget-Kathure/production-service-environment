@@ -73,7 +73,7 @@ No other application path is permitted â€” the only allowed edges are Internetâ†
 
 | Resource | Name |
 |---|---|
-| ECS cluster | `devops-g2-cluster` |
+| ECS cluster | `devops-g2-cluster-iac` |
 | Service Connect namespace | `group2.internal` (see note below) |
 | ECR repositories | `devops-g2-service-a` / `-b` / `-c` |
 | Security groups | `devops-g2-alb-sg`, `devops-g2-service-a/b/c-sg` |

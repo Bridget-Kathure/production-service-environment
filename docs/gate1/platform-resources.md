@@ -8,8 +8,8 @@ Reference for Pearl (Service B + C) — everything Patricia's platform build cre
 
 | Field | Value |
 |---|---|
-| Cluster name | `devops-g2-cluster` |
-| Cluster ARN | `arn:aws:ecs:us-east-2:827478161993:cluster/devops-g2-cluster` |
+| Cluster name | `devops-g2-cluster-iac` |
+| Cluster ARN | `arn:aws:ecs:us-east-2:827478161993:cluster/devops-g2-cluster-iac` |
 | Region | us-east-2 |
 
 ## Service Connect namespace

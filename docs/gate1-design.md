@@ -136,7 +136,7 @@ All rules use `source_security_group_id`. No CIDR blocks, no IP allowlists, no `
 | ALB | devops-g2-alb | platform |
 | ALB SG | devops-g2-alb-sg | platform |
 | Target Group (A) | devops-g2-service-a-tg | service-a |
-| ECS Cluster | devops-g2-cluster | platform |
+| ECS Cluster | devops-g2-cluster-iac | platform |
 | Service Connect NS | group2.internal | platform |
 | CloudWatch Log A | /ecs/devops-g2-service-a | service-a |
 | CloudWatch Log B | /ecs/devops-g2-service-b | service-b |

@@ -23,7 +23,7 @@
 
 | Resource | Depends on |
 |---|---|
-| ECS cluster — devops-g2-cluster | VPC/subnets |
+| ECS cluster — devops-g2-cluster-iac | VPC/subnets |
 | Service Connect namespace — group2.internal | ECS cluster |
 | Shared execution role — devops-g2-ecs-execution-role | Used by every task definition (A, B, C) |
 | Shared task role — devops-g2-ecs-task-role | Used by every task definition (A, B, C); carries the SSM messaging inline policy for ECS Exec |
