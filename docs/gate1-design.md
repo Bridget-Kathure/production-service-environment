@@ -115,7 +115,10 @@ With only two engineers, ownership rotates across all three cycles to prevent ei
 - Internet → Service C: **DENY**
 - Service A → Service C directly: **DENY** (no SG rule)
 - Service B → Service A: **DENY** (no reverse rule)
-- Service C → Any outbound: **DENY** (no egress rules)
+
+### Egress
+
+All three services (A, B, and C) allow full outbound egress (`0.0.0.0/0`, all protocols) via the NAT gateway. This is required for ECR image pulls, CloudWatch Logs, and SSM (ECS Exec) and is not restricted at the security-group level. Only **ingress** is controlled, via security-group references as shown in the matrix above. This applies equally to Service C; there is nothing egress-specific about it.
 
 All rules use `source_security_group_id`. No CIDR blocks, no IP allowlists, no `0.0.0.0/0` on application ports.
 
