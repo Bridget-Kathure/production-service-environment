@@ -20,6 +20,23 @@
 2. `ecs-platform` → `ecs-service` (A, B, C)
 3. `alb` → `ecs-service` (A only, for target group attachment)
 
+```mermaid
+graph TD
+    BOOT[bootstrap stack<br/>S3 state + lock] --> VER[versions + AWS provider<br/>us-east-2]
+    VER --> NET[module.network<br/>VPC public x2 private x2 NAT routes]
+    NET --> PLAT[module.ecs-platform<br/>cluster + Service Connect ns]
+    PLAT --> SVCA[module.ecs-service A<br/>desired 2 + ALB attach]
+    PLAT --> SVCB[module.ecs-service B<br/>desired 1]
+    PLAT --> SVCC[module.ecs-service C<br/>desired 1]
+    NET --> ALB[module.alb<br/>TG type ip - listener :80]
+    ALB --> SVCA
+    SVCA --> SC[Service Connect<br/>group2.internal]
+    SVCB --> SC
+    SVCC --> SC
+```
+
+**Runtime:** `Internet → ALB :80 → Service A → Service B → Service C` (by Service Connect name, no task IPs)
+
 ### Ownership Rotation (2-Person Adaptation)
 
 With only two engineers, ownership rotates across all three cycles to prevent either person from becoming a single point of knowledge failure.

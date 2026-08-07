@@ -68,6 +68,11 @@ resource "aws_lb_target_group" "service_a" {
 
   lifecycle {
     create_before_destroy = true
+
+    postcondition {
+      condition     = self.target_type == "ip"
+      error_message = "Architecture rule violated: target group type must be 'ip' for Fargate awsvpc mode."
+    }
   }
 }
 

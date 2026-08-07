@@ -137,4 +137,11 @@ resource "aws_ecs_service" "main" {
     Name  = local.full_name
     Owner = "service-${var.service_name}"
   }
+
+  lifecycle {
+    postcondition {
+      condition     = self.network_configuration[0].assign_public_ip == false
+      error_message = "Architecture rule violated: ECS service must not receive a public IP (assign_public_ip must be false)."
+    }
+  }
 }
