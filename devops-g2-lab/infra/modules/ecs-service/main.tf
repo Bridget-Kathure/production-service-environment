@@ -79,7 +79,8 @@ resource "aws_ecs_task_definition" "main" {
       environment = [
         { name = "SERVICE_NAME", value = var.service_name },
         { name = "UPSTREAM_SERVICE", value = var.upstream_service },
-        { name = "APP_PORT", value = tostring(var.app_port) }
+        { name = "APP_PORT", value = tostring(var.app_port) },
+        { name = "GIT_SHA", value = var.image_tag }
       ]
     }
   ])
@@ -91,11 +92,12 @@ resource "aws_ecs_task_definition" "main" {
 }
 
 resource "aws_ecs_service" "main" {
-  name            = local.full_name
-  cluster         = var.cluster_arn
-  task_definition = aws_ecs_task_definition.main.arn
-  desired_count   = var.desired_count
-  launch_type     = "FARGATE"
+  name                   = local.full_name
+  cluster                = var.cluster_arn
+  task_definition        = aws_ecs_task_definition.main.arn
+  desired_count          = var.desired_count
+  launch_type            = "FARGATE"
+  enable_execute_command = true
 
   network_configuration {
     subnets          = var.private_subnet_ids

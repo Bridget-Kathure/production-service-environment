@@ -20,4 +20,16 @@ terraform {
 
 provider "aws" {
   region = "us-east-2"
+
+  # Applies to every resource created through this provider, including
+  # child modules (none of which declare their own provider block).
+  # Resource-level `tags = { ... }` blocks still set Name/Owner per
+  # resource; explicit tags win over default_tags on key collisions.
+  default_tags {
+    tags = {
+      Project     = "devops-g2"
+      Group       = "g2"
+      Environment = "lab"
+    }
+  }
 }

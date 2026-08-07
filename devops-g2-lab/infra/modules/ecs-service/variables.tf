@@ -36,8 +36,11 @@ variable "image_tag" {
   description = "Git SHA tag for the container image"
   type        = string
   validation {
-    condition     = var.image_tag != "latest"
-    error_message = "Image tag cannot be 'latest'. Use a Git SHA."
+    # Accepts a 7-char short SHA or a full 40-char SHA (matches what the
+    # buildspecs produce: cut -c1-7 of CODEBUILD_RESOLVED_SOURCE_VERSION).
+    # Explicitly rejects "latest" and placeholder values like "placeholder".
+    condition     = can(regex("^[0-9a-f]{7}$|^[0-9a-f]{40}$", var.image_tag))
+    error_message = "Image tag must be an immutable Git SHA (7 or 40 lowercase hex characters). 'latest' and placeholder values are not accepted."
   }
 }
 

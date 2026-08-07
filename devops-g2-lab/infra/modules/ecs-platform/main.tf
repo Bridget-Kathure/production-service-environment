@@ -120,3 +120,27 @@ resource "aws_iam_role" "ecs_task" {
     Owner = var.owner
   }
 }
+
+# Required for `aws ecs execute-command` (ECS Exec) to work against tasks
+# using this role. Without this, exec sessions fail even when
+# enable_execute_command = true is set on the service.
+resource "aws_iam_role_policy" "ecs_task_exec" {
+  name = "${local.name_prefix}-ecs-task-exec"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}

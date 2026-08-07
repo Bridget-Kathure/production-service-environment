@@ -34,7 +34,7 @@ module "service_c" {
   private_subnet_ids = module.network.private_app_subnet_ids
   execution_role_arn = module.ecs_platform.execution_role_arn
   task_role_arn      = module.ecs_platform.task_role_arn
-  image_tag          = "placeholder"
+  image_tag          = "0000000" # TODO: replace with the real Git SHA after the first image push (see buildspecs/)
   app_port           = 3003
   desired_count      = 1
   namespace_id       = module.ecs_platform.namespace_id
@@ -54,7 +54,7 @@ module "service_b" {
   private_subnet_ids = module.network.private_app_subnet_ids
   execution_role_arn = module.ecs_platform.execution_role_arn
   task_role_arn      = module.ecs_platform.task_role_arn
-  image_tag          = "placeholder"
+  image_tag          = "0000000" # TODO: replace with the real Git SHA after the first image push (see buildspecs/)
   app_port           = 3002
   desired_count      = 1
   namespace_id       = module.ecs_platform.namespace_id
@@ -74,12 +74,12 @@ module "service_a" {
   private_subnet_ids   = module.network.private_app_subnet_ids
   execution_role_arn   = module.ecs_platform.execution_role_arn
   task_role_arn        = module.ecs_platform.task_role_arn
-  image_tag            = "placeholder"
+  image_tag            = "0000000" # TODO: replace with the real Git SHA after the first image push (see buildspecs/)
   app_port             = 3000
   desired_count        = 2
   namespace_id         = module.ecs_platform.namespace_id
   namespace_name       = module.ecs_platform.namespace_name
-  upstream_service     = "service-b"
+  upstream_service     = "service-b-iac"
   alb_target_group_arn = module.alb.target_group_arn
   owner                = "service-a"
 }

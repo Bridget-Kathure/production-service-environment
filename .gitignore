@@ -34,5 +34,19 @@ Thumbs.db
 # Git
 .git/
 
+# Terraform / OpenTofu - never commit state, plans, or var files that
+# may carry secrets. .terraform.lock.hcl is intentionally NOT ignored -
+# it should be committed for version pinning.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.plan
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+crash.log
+crash.*.log
+
 # Alertmanager (contains real Slack webhook URL - never commit)
 alertmanager/alertmanager.yml
