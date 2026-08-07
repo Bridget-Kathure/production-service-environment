@@ -13,3 +13,8 @@ output "ecr_repository_url" {
 output "cloudwatch_log_group" {
   value = aws_cloudwatch_log_group.main.name
 }
+
+output "app_port" {
+  description = "Port this service listens on - reference this from a caller's upstream_port instead of hardcoding a matching literal, so they can't drift apart."
+  value       = var.app_port
+}

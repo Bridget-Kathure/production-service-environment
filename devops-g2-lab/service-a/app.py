@@ -6,6 +6,7 @@ app = Flask(__name__)
 service_name = os.environ.get('SERVICE_NAME', 'unknown')
 sha = os.environ.get('GIT_SHA', 'dev')
 upstream = os.environ.get('UPSTREAM_SERVICE', '')
+upstream_port = os.environ.get('UPSTREAM_PORT', '80')
 
 @app.route('/')
 def health():
@@ -16,7 +17,7 @@ def health():
     }
     if upstream:
         try:
-            resp = requests.get(f"http://{upstream}/", timeout=5)
+            resp = requests.get(f"http://{upstream}:{upstream_port}/", timeout=5)
             result["upstream"] = resp.json()
         except Exception as e:
             result["upstream_error"] = str(e)
