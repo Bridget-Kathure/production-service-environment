@@ -79,7 +79,8 @@ resource "aws_ecs_task_definition" "main" {
       environment = [
         { name = "SERVICE_NAME", value = var.service_name },
         { name = "UPSTREAM_SERVICE", value = var.upstream_service },
-        { name = "APP_PORT", value = tostring(var.app_port) }
+        { name = "APP_PORT", value = tostring(var.app_port) },
+        { name = "GIT_SHA", value = var.image_tag }
       ]
     }
   ])
