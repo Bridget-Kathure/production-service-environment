@@ -79,7 +79,7 @@ module "service_a" {
   desired_count        = 2
   namespace_id         = module.ecs_platform.namespace_id
   namespace_name       = module.ecs_platform.namespace_name
-  upstream_service     = "service-b"
+  upstream_service     = "service-b-iac"
   alb_target_group_arn = module.alb.target_group_arn
   owner                = "service-a"
 }
