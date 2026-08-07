@@ -11,7 +11,9 @@
 | Lockfile | `.terraform.lock.hcl` committed after first `terraform init` |
 | AWS Region | `us-east-2` only |
 
-Live in code today — `infra/bootstrap/main.tf` and `infra/environments/lab/versions.tf`:
+**Repository layout note (addresses Group 10's peer review question):** the assignment's repository sketch puts IaC at repo-root `infra/`. Ours lives under `devops-g2-lab/infra/` instead, deliberately: this repo already contains an unrelated console/Compose/VM tree from earlier labs, and nesting under `devops-g2-lab/` keeps the greenfield Terraform work isolated from that existing tree rather than mixing them at the root.
+
+Live in code today — `devops-g2-lab/infra/bootstrap/main.tf` and `devops-g2-lab/infra/environments/lab/versions.tf`:
 
 ```hcl
 terraform {
