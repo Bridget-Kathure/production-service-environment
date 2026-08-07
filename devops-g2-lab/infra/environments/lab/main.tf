@@ -60,6 +60,7 @@ module "service_b" {
   namespace_id       = module.ecs_platform.namespace_id
   namespace_name     = module.ecs_platform.namespace_name
   upstream_service   = "service-c-iac"
+  upstream_port      = module.service_c.app_port
   owner              = "service-b"
 }
 
@@ -80,6 +81,7 @@ module "service_a" {
   namespace_id         = module.ecs_platform.namespace_id
   namespace_name       = module.ecs_platform.namespace_name
   upstream_service     = "service-b-iac"
+  upstream_port        = module.service_b.app_port
   alb_target_group_arn = module.alb.target_group_arn
   owner                = "service-a"
 }

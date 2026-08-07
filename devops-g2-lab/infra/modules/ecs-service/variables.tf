@@ -82,6 +82,12 @@ variable "upstream_service" {
   default = ""
 }
 
+variable "upstream_port" {
+  description = "Port the upstream service listens on, for calls made via Service Connect (empty when this service has no upstream, e.g. Service C)"
+  type        = string
+  default     = ""
+}
+
 variable "ingress_sg_id" {
   type    = string
   default = ""
