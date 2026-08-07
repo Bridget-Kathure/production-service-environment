@@ -91,11 +91,12 @@ resource "aws_ecs_task_definition" "main" {
 }
 
 resource "aws_ecs_service" "main" {
-  name            = local.full_name
-  cluster         = var.cluster_arn
-  task_definition = aws_ecs_task_definition.main.arn
-  desired_count   = var.desired_count
-  launch_type     = "FARGATE"
+  name                   = local.full_name
+  cluster                = var.cluster_arn
+  task_definition        = aws_ecs_task_definition.main.arn
+  desired_count          = var.desired_count
+  launch_type            = "FARGATE"
+  enable_execute_command = true
 
   network_configuration {
     subnets          = var.private_subnet_ids
