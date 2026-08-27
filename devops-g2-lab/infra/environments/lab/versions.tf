@@ -9,11 +9,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket       = "devops-g2-tfstate-827478161993"
+    bucket       = "devops-g2-tfstate-240462142849"
     key          = "lab/workload.tfstate"
     region       = "us-east-2"
     encrypt      = true
-    kms_key_id   = "arn:aws:kms:us-east-2:827478161993:alias/devops-g2-tfstate-key"
+    kms_key_id   = "arn:aws:kms:us-east-2:240462142849:alias/devops-g2-tfstate-key"
     use_lockfile = true
     # Migrated from dynamodb_table (deprecated) to native S3 locking.
     # NOT YET APPLIED: this only takes effect after `terraform init
